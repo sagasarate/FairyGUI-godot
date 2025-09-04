@@ -8,4 +8,4 @@ BlendMode有限制
 不支持FGUI编辑器内制作的BmpFont，只能在Godot引擎内制作并注册进FGUI
 文本和输入组件是使用Godot的对应组件包装而成，所以功能受限，比如除了RichTextField都不支持UBB，RichTextField也无法引用UI包中的图片，等等
 
-Demo是用Laya版本的Demo改的，基于上述不支持的特性，某些Demo是无法正常工作的
+Demo是用Laya版本的Demo改的，基于上述不支持的特性，某些Demo是无法正常工作的，开发是在Godot4.4下完成的，4.5也可以运行，不过导入项目时编辑器可能崩溃，用恢复模式完成导入，然后正常打开就可以运行了
