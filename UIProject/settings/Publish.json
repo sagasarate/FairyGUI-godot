@@ -1,0 +1,35 @@
+{
+  "path": "../Examples/Resources",
+  "branchPath": "",
+  "fileExtension": "res",
+  "packageCount": 2,
+  "compressDesc": false,
+  "binaryFormat": true,
+  "jpegQuality": 80,
+  "compressPNG": false,
+  "codeGeneration": {
+    "allowGenCode": true,
+    "codePath": "",
+    "classNamePrefix": "",
+    "memberNamePrefix": "m_",
+    "packageName": "",
+    "ignoreNoname": true,
+    "getMemberByName": false,
+    "codeType": ""
+  },
+  "includeHighResolution": 0,
+  "branchProcessing": 0,
+  "seperatedAtlasForBranch": false,
+  "atlasSetting": {
+    "maxSize": 2048,
+    "paging": true,
+    "sizeOption": "pot",
+    "forceSquare": false,
+    "allowRotation": false,
+    "trimImage": true
+  },
+  "include2x": false,
+  "include3x": false,
+  "include4x": false,
+  "fileName": "Publish"
+}

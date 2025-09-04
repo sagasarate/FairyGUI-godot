@@ -1,0 +1,2053 @@
+﻿using System;
+using Godot;
+using FairyGUI.Utils;
+
+namespace FairyGUI
+{
+    public class GObject : EventDispatcher
+    {
+        /// <summary>
+        /// GObject的id，仅作为内部使用。与name不同，id值是不会相同的。
+        /// id is for internal use only.
+        /// </summary>
+        public string id { get; private set; }
+
+        /// <summary>
+        /// Name of the object.
+        /// </summary>
+        public string name
+        {
+            get { return _name; }
+            set
+            {
+                _name = value;
+                if (displayObject != null)
+                    displayObject.node.Name = $"{_name}({GetType().Name})";
+            }
+        }
+
+        /// <summary>
+        /// User defined data. 
+        /// </summary>
+        public object data;
+
+        /// <summary>
+        /// The source width of the object.
+        /// </summary>
+        public int sourceWidth;
+
+        /// <summary>
+        /// The source height of the object.
+        /// </summary>
+        public int sourceHeight;
+
+        /// <summary>
+        /// The initial width of the object.
+        /// </summary>
+        public int initWidth;
+
+        /// <summary>
+        /// The initial height of the object.
+        /// </summary>
+        public int initHeight;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public int minWidth;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public int maxWidth;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public int minHeight;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public int maxHeight;
+
+        /// <summary>
+        /// Relations Object.
+        /// </summary>
+        public Relations relations { get; private set; }
+
+        /// <summary>
+        /// Restricted range of dragging.
+        /// </summary>
+        public Rect? dragBounds;
+
+        /// <summary>
+        /// Parent object.
+        /// </summary>
+        public GComponent parent { get; private set; }
+
+        /// <summary>
+        /// Lowlevel display object.
+        /// </summary>
+        public IDisplayObject displayObject { get; protected set; }
+
+        /// <summary>
+        /// 当前全局正在被拖动的对象
+        /// </summary>
+        public static GObject draggingObject { get; private set; }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public PackageItem packageItem;
+
+        string _name;
+        float _x;
+        float _y;
+        float _pivotX;
+        float _pivotY;
+        bool _pivotAsAnchor;
+        float _alpha;
+        float _rotation;
+        bool _visible = true;
+        bool _internalVisible = true;
+        bool _handlingController;
+        bool _touchable = true;
+        bool _grayed;
+        bool _draggable;
+        float _scaleX;
+        float _scaleY;
+        int _sortingOrder;
+        string _tooltips;
+        bool _focusable = false;
+        bool _tabStop = false;
+        GGroup _group;
+
+        GearBase[] _gears;
+
+        EventListener _onClick;
+        EventListener _onRightClick;
+        EventListener _onTouchBegin;
+        EventListener _onTouchMove;
+        EventListener _onTouchEnd;
+        EventListener _onRollOver;
+        EventListener _onRollOut;
+        EventListener _onMouseWheel;
+        EventListener _onAddedToStage;
+        EventListener _onRemovedFromStage;
+        EventListener _onKeyDown;
+        EventListener _onClickLink;
+        EventListener _onPositionChanged;
+        EventListener _onSizeChanged;
+        EventListener _onDragStart;
+        EventListener _onDragMove;
+        EventListener _onDragEnd;
+        EventListener _onGearStop;
+        EventListener _onFocusIn;
+        EventListener _onFocusOut;
+
+
+        internal protected bool underConstruct;
+        internal float _width;
+        internal float _height;
+        internal float _rawWidth;
+        internal float _rawHeight;
+        internal bool _gearLocked;
+        internal float _sizePercentInGroup;
+        internal bool _disposed;
+        internal GTreeNode _treeNode;
+
+        internal static uint _gInstanceCounter;
+
+        public GObject()
+        {
+            _width = 0;
+            _height = 0;
+            _alpha = 1;
+            _scaleX = 1;
+            _scaleY = 1;
+            id = "_n" + _gInstanceCounter++;
+            CreateDisplayObject();
+            name = id;
+            relations = new Relations(this);
+            _gears = new GearBase[10];
+            Stage.allObject.Add(this);
+        }
+
+        public EventListener onClick
+        {
+            get { return _onClick ?? (_onClick = new EventListener(this, "onClick")); }
+        }
+        public EventListener onRightClick
+        {
+            get { return _onRightClick ?? (_onRightClick = new EventListener(this, "onRightClick")); }
+        }
+        public EventListener onTouchBegin
+        {
+            get { return _onTouchBegin ?? (_onTouchBegin = new EventListener(this, "onTouchBegin")); }
+        }
+        public EventListener onTouchMove
+        {
+            get { return _onTouchMove ?? (_onTouchMove = new EventListener(this, "onTouchMove")); }
+        }
+        public EventListener onTouchEnd
+        {
+            get { return _onTouchEnd ?? (_onTouchEnd = new EventListener(this, "onTouchEnd")); }
+        }
+        public EventListener onRollOver
+        {
+            get { return _onRollOver ?? (_onRollOver = new EventListener(this, "onRollOver")); }
+        }
+        public EventListener onRollOut
+        {
+            get { return _onRollOut ?? (_onRollOut = new EventListener(this, "onRollOut")); }
+        }
+        public EventListener onMouseWheel
+        {
+            get { return _onMouseWheel ?? (_onMouseWheel = new EventListener(this, "onMouseWheel")); }
+        }
+        public EventListener onAddedToStage
+        {
+            get { return _onAddedToStage ?? (_onAddedToStage = new EventListener(this, "onAddedToStage")); }
+        }
+        public EventListener onRemovedFromStage
+        {
+            get { return _onRemovedFromStage ?? (_onRemovedFromStage = new EventListener(this, "onRemovedFromStage")); }
+        }
+        public EventListener onKeyDown
+        {
+            get { return _onKeyDown ?? (_onKeyDown = new EventListener(this, "onKeyDown")); }
+        }
+        public EventListener onClickLink
+        {
+            get { return _onClickLink ?? (_onClickLink = new EventListener(this, "onClickLink")); }
+        }
+        public EventListener onPositionChanged
+        {
+            get { return _onPositionChanged ?? (_onPositionChanged = new EventListener(this, "onPositionChanged")); }
+        }
+        public EventListener onSizeChanged
+        {
+            get { return _onSizeChanged ?? (_onSizeChanged = new EventListener(this, "onSizeChanged")); }
+        }
+        public EventListener onDragStart
+        {
+            get { return _onDragStart ?? (_onDragStart = new EventListener(this, "onDragStart")); }
+        }
+        public EventListener onDragMove
+        {
+            get { return _onDragMove ?? (_onDragMove = new EventListener(this, "onDragMove")); }
+        }
+        public EventListener onDragEnd
+        {
+            get { return _onDragEnd ?? (_onDragEnd = new EventListener(this, "onDragEnd")); }
+        }
+        public EventListener onGearStop
+        {
+            get { return _onGearStop ?? (_onGearStop = new EventListener(this, "onGearStop")); }
+        }
+        public EventListener onFocusIn
+        {
+            get { return _onFocusIn ?? (_onFocusIn = new EventListener(this, "onFocusIn")); }
+        }
+        public EventListener onFocusOut
+        {
+            get { return _onFocusOut ?? (_onFocusOut = new EventListener(this, "onFocusOut")); }
+        }
+        public float x
+        {
+            get { return _x; }
+            set
+            {
+                SetPosition(value, _y);
+            }
+        }
+        public float y
+        {
+            get { return _y; }
+            set
+            {
+                SetPosition(_x, value);
+            }
+        }
+        public Vector2 xy
+        {
+            get { return new Vector2(_x, _y); }
+            set { SetPosition(value.X, value.Y); }
+        }
+        public Vector2 position
+        {
+            get { return new Vector2(_x, _y); }
+            set { SetPosition(value.X, value.Y); }
+        }
+        public void SetXY(float xv, float yv)
+        {
+            SetPosition(xv, yv);
+        }
+        public void SetXY(float xv, float yv, bool topLeftValue)
+        {
+            if (_pivotAsAnchor)
+                SetPosition(xv + _pivotX * _width, yv + _pivotY * _height);
+            else
+                SetPosition(xv, yv);
+        }
+        public void SetPosition(float xv, float yv)
+        {
+            if (!Mathf.IsEqualApprox(_x, xv) || !Mathf.IsEqualApprox(_y, yv))
+            {
+                float dx = xv - _x;
+                float dy = yv - _y;
+                _x = xv;
+                _y = yv;
+
+                HandlePositionChanged();
+
+                if (this is GGroup)
+                    ((GGroup)this).MoveChildren(dx, dy);
+
+                UpdateGear(1);
+
+                if (parent != null && !(parent is GList))
+                {
+                    parent.SetBoundsChangedFlag();
+                    if (_group != null)
+                        _group.SetBoundsChangedFlag(true);
+                    DispatchEvent("onPositionChanged", null);
+                }
+
+                if (draggingObject == this && !sUpdateInDragging)
+                    sGlobalRect = this.LocalToGlobal(new Rect(0, 0, this.width, this.height));
+            }
+        }
+
+        /// <summary>
+        /// Set the object in middle of the parent or GRoot if the parent is not set.
+        /// </summary>
+        public void Center()
+        {
+            Center(false);
+        }
+
+        /// <summary>
+        /// Set the object in middle of the parent or GRoot if the parent is not set.
+        /// </summary>
+        /// <param name="restraint">Add relations to maintain the center state.</param>
+        public virtual void Center(bool restraint)
+        {
+            GComponent r;
+            if (parent != null)
+                r = parent;
+            else
+                r = this.root;
+
+            this.SetXY((int)((r.width - this.width) / 2), (int)((r.height - this.height) / 2), true);
+            if (restraint)
+            {
+                this.AddRelation(r, RelationType.Center_Center);
+                this.AddRelation(r, RelationType.Middle_Middle);
+            }
+        }
+
+        /// <summary>
+        /// 设置对象为全屏大小（逻辑屏幕）。
+        /// </summary>
+        public void MakeFullScreen()
+        {
+            this.SetSize(GRoot.inst.width, GRoot.inst.height);
+        }
+
+        /// <summary>
+        /// The width of the object in pixels.
+        /// </summary>
+        public float width
+        {
+            get
+            {
+                return _width;
+            }
+            set
+            {
+                SetSize(value, _rawHeight);
+            }
+        }
+
+        /// <summary>
+        /// The height of the object in pixels.
+        /// </summary>
+        public float height
+        {
+            get
+            {
+                return _height;
+            }
+            set
+            {
+                SetSize(_rawWidth, value);
+            }
+        }
+
+        /// <summary>
+        /// The size of the object in pixels.
+        /// </summary>
+        public Vector2 size
+        {
+            get { return new Vector2(width, height); }
+            set { SetSize(value.X, value.Y); }
+        }
+
+        /// <summary>
+        /// actualWidth = width * scalex
+        /// </summary>
+        public float actualWidth
+        {
+            get { return this.width * _scaleX; }
+        }
+
+        /// <summary>
+        /// actualHeight = height * scaleY
+        /// </summary>
+        public float actualHeight
+        {
+            get { return this.height * _scaleY; }
+        }
+
+        /// <summary>
+        /// Change size.
+        /// </summary>
+        /// <param name="wv">Width value.</param>
+        /// <param name="hv">Height value.</param>
+        public void SetSize(float wv, float hv)
+        {
+            SetSize(wv, hv, false, false);
+        }
+
+        /// <summary>
+        /// Change size.
+        /// </summary>
+        /// <param name="wv">Width value.</param>
+        /// <param name="hv">Height value.</param>
+        /// <param name="ignorePivot">If pivot is set, the object's positon will change when its size change. Set ignorePivot=true to keep the position.</param>
+        /// 
+        public void SetSize(float wv, float hv, bool ignorePivot, bool fromNode = false)
+        {
+            if (!Mathf.IsEqualApprox(_rawWidth, wv) || !Mathf.IsEqualApprox(_rawHeight, hv))
+            {
+                _rawWidth = wv;
+                _rawHeight = hv;
+                if (wv < minWidth)
+                    wv = minWidth;
+                else if (maxWidth > 0 && wv > maxWidth)
+                    wv = maxWidth;
+                if (hv < minHeight)
+                    hv = minHeight;
+                else if (maxHeight > 0 && hv > maxHeight)
+                    hv = maxHeight;
+                float dWidth = wv - _width;
+                float dHeight = hv - _height;
+                _width = wv;
+                _height = hv;
+
+                HandleSizeChanged(fromNode);
+
+                if (!Mathf.IsEqualApprox(_pivotX, 0) || !Mathf.IsEqualApprox(_pivotY, 0))
+                {
+                    UpdatePivot();
+                    if (!_pivotAsAnchor)
+                    {
+                        if (!ignorePivot)
+                            SetXY(_x - _pivotX * dWidth, _y - _pivotY * dHeight);
+                        else
+                            HandlePositionChanged();
+                    }
+                    else
+                        HandlePositionChanged();
+                }
+
+                if (this is GGroup)
+                    ((GGroup)this).ResizeChildren(dWidth, dHeight);
+
+                UpdateGear(2);
+
+                if (parent != null)
+                {
+                    relations.OnOwnerSizeChanged(dWidth, dHeight, _pivotAsAnchor || !ignorePivot);
+                    parent.SetBoundsChangedFlag();
+                    if (_group != null)
+                        _group.SetBoundsChangedFlag();
+                }
+
+                DispatchEvent("onSizeChanged", null);
+            }
+        }
+
+        protected void SetSizeDirectly(float wv, float hv)
+        {
+            _rawWidth = wv;
+            _rawHeight = hv;
+            if (wv < 0)
+                wv = 0;
+            if (hv < 0)
+                hv = 0;
+            _width = wv;
+            _height = hv;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public float xMin
+        {
+            get
+            {
+                return _pivotAsAnchor ? (_x - _width * _pivotX) : _x;
+            }
+            set
+            {
+                if (_pivotAsAnchor)
+                    SetPosition(value + _width * _pivotX, _y);
+                else
+                    SetPosition(value, _y);
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public float yMin
+        {
+            get
+            {
+                return _pivotAsAnchor ? (_y - _height * _pivotY) : _y;
+            }
+            set
+            {
+                if (_pivotAsAnchor)
+                    SetPosition(_x, value + _height * _pivotY);
+                else
+                    SetPosition(_x, value);
+            }
+        }
+
+        /// <summary>
+        /// The horizontal scale factor. '1' means no scale, cannt be negative.
+        /// </summary>
+        public float scaleX
+        {
+            get { return _scaleX; }
+            set
+            {
+                SetScale(value, _scaleY);
+            }
+        }
+
+        /// <summary>
+        /// The vertical scale factor. '1' means no scale, cannt be negative.
+        /// </summary>
+        public float scaleY
+        {
+            get { return _scaleY; }
+            set
+            {
+                SetScale(_scaleX, value);
+            }
+        }
+
+        /// <summary>
+        /// The scale factor.
+        /// </summary>
+        public Vector2 scale
+        {
+            get { return new Vector2(_scaleX, _scaleY); }
+            set { SetScale(value.X, value.Y); }
+        }
+
+        /// <summary>
+        /// Change the scale factor.
+        /// </summary>
+        /// <param name="wv">The horizontal scale factor.</param>
+        /// <param name="hv">The vertical scale factor</param>
+        public void SetScale(float wv, float hv)
+        {
+            if (!Mathf.IsEqualApprox(_scaleX, wv) || !Mathf.IsEqualApprox(_scaleY, hv))
+            {
+                _scaleX = wv;
+                _scaleY = hv;
+                HandleScaleChanged();
+
+                UpdateGear(2);
+            }
+        }
+        public float skewX
+        {
+            get
+            {
+                if (displayObject != null)
+                    return displayObject.skewX;
+                else
+                    return 0;
+            }
+            set
+            {
+                if (displayObject != null)
+                    displayObject.skewX = value;
+            }
+        }
+        public float skewY
+        {
+            get
+            {
+                if (displayObject != null)
+                    return displayObject.skewY;
+                else
+                    return 0;
+            }
+            set
+            {
+                if (displayObject != null)
+                    displayObject.skewY = value;
+            }
+        }
+        public Vector2 skew
+        {
+            get
+            {
+                if (displayObject != null)
+                    return new Vector2(displayObject.skewX, displayObject.skewY);
+                else
+                    return Vector2.Zero;
+            }
+            set
+            {
+                if (displayObject != null)
+                {
+                    displayObject.skewX = value.X;
+                    displayObject.skewY = value.Y;
+                }
+            }
+        }
+
+        /// <summary>
+        /// The x coordinate of the object's origin in its own coordinate space.
+        /// </summary>
+        public float pivotX
+        {
+            get { return _pivotX; }
+            set
+            {
+                SetPivot(value, _pivotY, _pivotAsAnchor);
+            }
+        }
+
+        /// <summary>
+        /// The y coordinate of the object's origin in its own coordinate space.
+        /// </summary>
+        public float pivotY
+        {
+            get { return _pivotY; }
+            set
+            {
+                SetPivot(_pivotX, value, _pivotAsAnchor);
+            }
+        }
+
+        /// <summary>
+        /// The x and y coordinates of the object's origin in its own coordinate space.
+        /// </summary>
+        public Vector2 pivot
+        {
+            get { return new Vector2(_pivotX, _pivotY); }
+            set { SetPivot(value.X, value.Y, _pivotAsAnchor); }
+        }
+
+        public bool pivotAsAnchor
+        {
+            get { return _pivotAsAnchor; }
+            set
+            {
+                SetPivot(_pivotX, _pivotY, value);
+            }
+        }
+
+        /// <summary>
+        /// Change the x and y coordinates of the object's origin in its own coordinate space.
+        /// </summary>
+        /// <param name="xv">x value in ratio</param>
+        /// <param name="yv">y value in ratio</param>
+        public void SetPivot(float xv, float yv)
+        {
+            SetPivot(xv, yv, false);
+        }
+
+        /// <summary>
+        ///  Change the x and y coordinates of the object's origin in its own coordinate space.
+        /// </summary>
+        /// <param name="xv">x value in ratio</param>
+        /// <param name="yv">y value in ratio</param>
+        /// <param name="asAnchor">If use the pivot as the anchor position</param>
+        public void SetPivot(float xv, float yv, bool asAnchor)
+        {
+            if (!Mathf.IsEqualApprox(_pivotX, xv) || !Mathf.IsEqualApprox(_pivotY, yv) || _pivotAsAnchor != asAnchor)
+            {
+                _pivotX = xv;
+                _pivotY = yv;
+                _pivotAsAnchor = asAnchor;
+                UpdatePivot();
+                HandlePositionChanged();
+            }
+        }
+
+        void UpdatePivot()
+        {
+            if (displayObject != null)
+                displayObject.node.PivotOffset = new Vector2(_pivotX * _width, _pivotY * _height);
+        }
+
+        /// <summary>
+        /// If the object can touch or click. GImage/GTextField is not touchable even it is true.
+        /// </summary>
+        public bool touchable
+        {
+            get
+            {
+                return _touchable;
+            }
+            set
+            {
+                if (_touchable != value)
+                {
+                    _touchable = value;
+                    UpdateGear(3);
+                    UpdateFocusMode();                    
+                }
+            }
+        }
+
+        /// <summary>
+        /// If true, apply a grayed effect on this object.
+        /// </summary>
+        public bool grayed
+        {
+            get
+            {
+                return _grayed;
+            }
+            set
+            {
+                if (_grayed != value)
+                {
+                    _grayed = value;
+                    HandleGrayedChanged();
+                    UpdateGear(3);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Enabled is shortcut for grayed and !touchable combination.
+        /// </summary>
+        public bool enabled
+        {
+            get
+            {
+                return !_grayed && _touchable;
+            }
+            set
+            {
+                this.grayed = !value;
+                this.touchable = value;
+            }
+        }
+
+        /// <summary>
+        /// The rotation around the z axis of the object in degrees.
+        /// </summary>
+        public float rotation
+        {
+            get
+            {
+                return _rotation;
+            }
+            set
+            {
+                if (!Mathf.IsEqualApprox(_rotation, value))
+                {
+                    _rotation = value;
+                    if (displayObject != null)
+                        displayObject.node.Rotation = Mathf.DegToRad(_rotation);
+                    UpdateGear(3);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The opacity of the object. 0 = transparent, 1 = opaque.
+        /// </summary>
+        public float alpha
+        {
+
+            get
+            {
+                return _alpha;
+            }
+
+            set
+            {
+                _alpha = value;
+                HandleAlphaChanged();
+                UpdateGear(3);
+            }
+        }
+
+        /// <summary>
+        /// The visibility of the object. An invisible object will be untouchable.
+        /// </summary>
+        public bool visible
+        {
+            get
+            {
+                return _visible;
+            }
+
+            set
+            {
+                if (_visible != value)
+                {
+                    _visible = value;
+                    HandleVisibleChanged();
+                    if (parent != null)
+                        parent.SetBoundsChangedFlag();
+                    if (_group != null && _group.excludeInvisibles)
+                        _group.SetBoundsChangedFlag();
+                }
+            }
+        }
+
+        internal bool internalVisible
+        {
+            get
+            {
+                return _internalVisible && (group == null || group.internalVisible);
+            }
+        }
+
+        internal bool internalVisible2
+        {
+            get
+            {
+                return _visible && (group == null || group.internalVisible2);
+            }
+        }
+
+        internal bool internalVisible3
+        {
+            get
+            {
+                return _visible && _internalVisible;
+            }
+        }
+
+        /// <summary>
+        /// By default(when sortingOrder==0), object added to component is arrange by the added roder. 
+        /// The bigger is the sorting order, the object is more in front.
+        /// </summary>
+        public int sortingOrder
+        {
+            get { return _sortingOrder; }
+            set
+            {
+                if (value < 0)
+                    value = 0;
+                if (_sortingOrder != value)
+                {
+                    int old = _sortingOrder;
+                    _sortingOrder = value;
+                    if (parent != null)
+                        parent.ChildSortingOrderChanged(this, old, _sortingOrder);
+                }
+            }
+        }
+
+        /// <summary>
+        /// If the object can be focused?
+        /// </summary>
+        public bool focusable
+        {
+            get { return _focusable; }
+            set
+            {
+                _focusable = value;
+                UpdateFocusMode();
+            }
+        }
+
+        /// <summary>
+        /// If the object can be navigated by TAB?
+        /// </summary>
+        public bool tabStop
+        {
+            get { return _tabStop; }
+            set
+            {
+                _tabStop = value;
+                UpdateFocusMode();
+            }
+        }
+
+        void UpdateFocusMode()
+        {
+            if (displayObject != null)
+            {
+                displayObject.node.FocusMode = (_focusable && _touchable) ? (_tabStop ? Control.FocusModeEnum.All : Control.FocusModeEnum.Click) : Control.FocusModeEnum.None;
+            }
+        }
+
+        /// <summary>
+        /// If the object is focused. 
+        /// </summary>
+        public bool focused
+        {
+            get { return displayObject != null && displayObject.node.HasFocus(); }
+        }
+
+        /// <summary>
+        /// Request focus on this object.
+        /// </summary>
+        public void RequestFocus()
+        {
+            if (displayObject != null)
+                displayObject.node.GrabFocus();
+        }
+
+
+        /// <summary>
+        /// Tooltips of this object. UIConfig.tooltipsWin must be set first.
+        /// </summary>
+        public string tooltips
+        {
+            get { return _tooltips; }
+            set
+            {
+                if (!string.IsNullOrEmpty(_tooltips))
+                {
+                    this.onRollOver.Remove(__rollOver);
+                    this.onRollOut.Remove(__rollOut);
+                }
+
+                _tooltips = value;
+                if (!string.IsNullOrEmpty(_tooltips))
+                {
+                    this.onRollOver.Add(__rollOver);
+                    this.onRollOut.Add(__rollOut);
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <value></value>
+        public Control.CursorShape cursor
+        {
+            get { return displayObject != null ? displayObject.node.GetCursorShape() : Control.CursorShape.Arrow; }
+            set
+            {
+                if (displayObject != null)
+                    displayObject.node.MouseDefaultCursorShape = value;
+            }
+        }
+
+
+
+        private void __rollOver()
+        {
+            this.root.ShowTooltips(tooltips);
+        }
+
+        private void __rollOut()
+        {
+            this.root.HideTooltips();
+        }
+
+        virtual public BlendMode blendMode
+        {
+            get { return displayObject != null ? displayObject.blendMode : BlendMode.None; }
+            set { if (displayObject != null) displayObject.blendMode = value; }
+        }
+
+        /// <summary>
+        /// If the object has lowlevel displayobject and the displayobject has a container parent?
+        /// </summary>
+        public bool inContainer
+        {
+            get
+            {
+                return displayObject != null && displayObject.node.GetParent() != null;
+            }
+        }
+
+        /// <summary>
+        /// If the object is on stage.
+        /// </summary>
+        public bool onStage
+        {
+            get
+            {
+                GObject obj = this;
+                do
+                {
+                    if (obj is GRoot)
+                        return true;
+                    obj = obj.parent;
+                } while (obj != null);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Resource url of this object.
+        /// </summary>
+        public string resourceURL
+        {
+            get
+            {
+                if (packageItem != null)
+                    return UIPackage.URL_PREFIX + packageItem.owner.id + packageItem.id;
+                else
+                    return null;
+            }
+        }
+
+        /// <summary>
+        /// Gear to xy controller.
+        /// </summary>
+        public GearXY gearXY
+        {
+            get
+            {
+                return (GearXY)GetGear(1);
+            }
+        }
+
+        /// <summary>
+        /// Gear to size controller.
+        /// </summary>
+        public GearSize gearSize
+        {
+            get
+            {
+                return (GearSize)GetGear(2);
+            }
+        }
+
+        /// <summary>
+        /// Gear to look controller.
+        /// </summary>
+        public GearLook gearLook
+        {
+            get
+            {
+                return (GearLook)GetGear(3);
+            }
+        }
+
+        public GearBase GetGear(int index)
+        {
+            GearBase gear = _gears[index];
+            if (gear == null)
+            {
+                switch (index)
+                {
+                    case 0:
+                        gear = new GearDisplay(this);
+                        break;
+                    case 1:
+                        gear = new GearXY(this);
+                        break;
+                    case 2:
+                        gear = new GearSize(this);
+                        break;
+                    case 3:
+                        gear = new GearLook(this);
+                        break;
+                    case 4:
+                        gear = new GearColor(this);
+                        break;
+                    case 5:
+                        gear = new GearAnimation(this);
+                        break;
+                    case 6:
+                        gear = new GearText(this);
+                        break;
+                    case 7:
+                        gear = new GearIcon(this);
+                        break;
+                    case 8:
+                        gear = new GearDisplay2(this);
+                        break;
+                    case 9:
+                        gear = new GearFontSize(this);
+                        break;
+                    default:
+                        throw new System.Exception("FairyGUI: invalid gear index!");
+                }
+                _gears[index] = gear;
+            }
+            return gear;
+        }
+
+        protected void UpdateGear(int index)
+        {
+            if (underConstruct || _gearLocked)
+                return;
+
+            GearBase gear = _gears[index];
+            if (gear != null && gear.controller != null)
+                gear.UpdateState();
+        }
+
+        internal bool CheckGearController(int index, Controller c)
+        {
+            return _gears[index] != null && _gears[index].controller == c;
+        }
+
+        internal void UpdateGearFromRelations(int index, float dx, float dy)
+        {
+            if (_gears[index] != null)
+                _gears[index].UpdateFromRelations(dx, dy);
+        }
+
+        internal uint AddDisplayLock()
+        {
+            GearDisplay gearDisplay = (GearDisplay)_gears[0];
+            if (gearDisplay != null && gearDisplay.controller != null)
+            {
+                uint ret = gearDisplay.AddLock();
+                CheckGearDisplay();
+
+                return ret;
+            }
+            else
+                return 0;
+        }
+
+        internal void ReleaseDisplayLock(uint token)
+        {
+            GearDisplay gearDisplay = (GearDisplay)_gears[0];
+            if (gearDisplay != null && gearDisplay.controller != null)
+            {
+                gearDisplay.ReleaseLock(token);
+                CheckGearDisplay();
+            }
+        }
+
+        void CheckGearDisplay()
+        {
+            if (_handlingController)
+                return;
+
+            bool connected = _gears[0] == null || ((GearDisplay)_gears[0]).connected;
+            if (_gears[8] != null)
+                connected = ((GearDisplay2)_gears[8]).Evaluate(connected);
+
+            if (connected != _internalVisible)
+            {
+                _internalVisible = connected;
+                if (parent != null)
+                    parent.ChildStateChanged(this);
+                if (_group != null && _group.excludeInvisibles)
+                    _group.SetBoundsChangedFlag();
+            }
+        }
+
+
+        virtual public void HandleControllerChanged(Controller c)
+        {
+            _handlingController = true;
+            for (int i = 0; i < 10; i++)
+            {
+                GearBase gear = _gears[i];
+                if (gear != null && gear.controller == c)
+                    gear.Apply();
+            }
+            _handlingController = false;
+
+            CheckGearDisplay();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="relationType"></param>
+        public void AddRelation(GObject target, RelationType relationType)
+        {
+            AddRelation(target, relationType, false);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="relationType"></param>
+        /// <param name="usePercent"></param>
+        public void AddRelation(GObject target, RelationType relationType, bool usePercent)
+        {
+            relations.Add(target, relationType, usePercent);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="target"></param>
+        /// <param name="relationType"></param>
+        public void RemoveRelation(GObject target, RelationType relationType)
+        {
+            relations.Remove(target, relationType);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void RemoveFromParent()
+        {
+            if (parent != null)
+                parent.RemoveChild(this);
+        }
+
+        /// <summary>
+        ///  Group belonging to.
+        /// </summary>
+        public GGroup group
+        {
+            get { return _group; }
+            set
+            {
+                if (_group != value)
+                {
+                    if (_group != null)
+                        _group.SetBoundsChangedFlag();
+                    _group = value;
+                    if (_group != null)
+                        _group.SetBoundsChangedFlag();
+                    HandleVisibleChanged();
+                    if (parent != null)
+                        parent.ChildStateChanged(this);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GRoot root
+        {
+            get
+            {
+                GObject p = this;
+                while (p.parent != null && !(p is GRoot))
+                    p = p.parent;
+
+                if (p is GRoot)
+                    return (GRoot)p;
+
+                return GRoot.inst;
+            }
+        }
+        public GRoot realRoot
+        {
+            get
+            {
+                GObject p = this;
+                while (p.parent != null && !(p is GRoot))
+                    p = p.parent;
+
+                if (p is GRoot)
+                    return (GRoot)p;
+
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        virtual public string text
+        {
+            get { return null; }
+            set { /*override in child*/}
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        virtual public string icon
+        {
+            get { return null; }
+            set { /*override in child*/}
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool draggable
+        {
+            get { return _draggable; }
+            set
+            {
+                if (_draggable != value)
+                {
+                    _draggable = value;
+                    InitDrag();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void StartDrag()
+        {
+            StartDrag(-1);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="touchId"></param>
+        public void StartDrag(int touchId)
+        {
+            if (!displayObject.node.IsInsideTree())
+                return;
+
+            DragBegin(touchId);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void StopDrag()
+        {
+            DragEnd();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool dragging
+        {
+            get { return draggingObject == this; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public Vector2 dragStartPos
+        {
+            get { return _dragTouchStartPos; }
+        }
+
+
+        public Vector2 LocalToGlobal(Vector2 pt)
+        {
+            if (_pivotAsAnchor)
+            {
+                pt.X += _width * _pivotX;
+                pt.Y += _height * _pivotY;
+            }
+            return displayObject.node.GetGlobalTransform() * pt;
+        }
+
+
+        public Vector2 GlobalToLocal(Vector2 pt)
+        {
+            pt = displayObject.node.GetGlobalTransform().AffineInverse() * pt;
+            if (_pivotAsAnchor)
+            {
+                pt.X -= _width * _pivotX;
+                pt.Y -= _height * _pivotY;
+            }
+            return pt;
+        }
+
+
+        public Rect LocalToGlobal(Rect rect)
+        {
+            Rect ret = new Rect();
+            Vector2 v = LocalToGlobal(new Vector2(rect.xMin, rect.yMin));
+            ret.xMin = v.X;
+            ret.yMin = v.Y;
+            v = LocalToGlobal(new Vector2(rect.xMax, rect.yMax));
+            ret.xMax = v.X;
+            ret.yMax = v.Y;
+            return ret;
+        }
+
+
+        public Rect GlobalToLocal(Rect rect)
+        {
+            Rect ret = new Rect();
+            Vector2 v = GlobalToLocal(new Vector2(rect.xMin, rect.yMin));
+            ret.xMin = v.X;
+            ret.yMin = v.Y;
+            v = GlobalToLocal(new Vector2(rect.xMax, rect.yMax));
+            ret.xMax = v.X;
+            ret.yMax = v.Y;
+            return ret;
+        }
+
+
+        public Vector2 LocalToViewport(Vector2 pt)
+        {
+            return displayObject.node.GetGlobalTransformWithCanvas() * pt;
+        }
+
+        public Rect LocalToViewport(Rect rect)
+        {
+            var min = LocalToViewport(rect.min);
+            var max = LocalToViewport(rect.max);
+            rect.min = min;
+            rect.max = max;
+            return rect;
+        }
+
+
+        public Vector2 ViewportToLocal(Vector2 pt)
+        {
+            return displayObject.node.MakeCanvasPositionLocal(pt);
+        }
+
+        public Vector2 LocalToScreen(Vector2 pt)
+        {
+            if (_pivotAsAnchor)
+            {
+                pt.X += _width * _pivotX;
+                pt.Y += _height * _pivotY;
+            }
+            return displayObject.node.GetScreenTransform() * pt;
+        }
+
+        public Vector2 ScreenToLocal(Vector2 pt)
+        {
+            pt = displayObject.node.GetScreenTransform().AffineInverse() * pt;
+            if (_pivotAsAnchor)
+            {
+                pt.X -= _width * _pivotX;
+                pt.Y -= _height * _pivotY;
+            }
+            return pt;
+        }
+
+
+        public Vector2 LocalToRoot(Vector2 pt)
+        {
+            return TransformPoint(pt, GRoot.inst);
+        }
+
+        public Vector2 RootToLocal(Vector2 pt)
+        {
+            return GRoot.inst.TransformPoint(pt, this);
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="point"></param>
+        /// <param name="targetSpace"></param>
+        /// <returns></returns>
+        public Vector2 TransformPoint(Vector2 pt, GObject targetSpace)
+        {
+            pt = LocalToGlobal(pt);
+            return targetSpace.GlobalToLocal(pt);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="rect"></param>
+        /// <param name="targetSpace"></param>
+        /// <returns></returns>
+        public Rect TransformRect(Rect rect, GObject targetSpace)
+        {
+            rect = LocalToGlobal(rect);
+            return targetSpace.GlobalToLocal(rect);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool isDisposed
+        {
+            get { return _disposed; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        virtual public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            RemoveFromParent();
+            RemoveEventListeners();
+            relations.Dispose();
+            relations = null;
+            for (int i = 0; i < 10; i++)
+            {
+                GearBase gear = _gears[i];
+                if (gear != null)
+                    gear.Dispose();
+            }
+            if (displayObject != null)
+            {
+                displayObject.node.QueueFree();
+                displayObject = null;
+            }
+            data = null;
+            Stage.allObject.Remove(this);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GImage asImage
+        {
+            get { return this as GImage; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GComponent asCom
+        {
+            get { return this as GComponent; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GButton asButton
+        {
+            get { return this as GButton; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GLabel asLabel
+        {
+            get { return this as GLabel; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GProgressBar asProgress
+        {
+            get { return this as GProgressBar; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GSlider asSlider
+        {
+            get { return this as GSlider; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GComboBox asComboBox
+        {
+            get { return this as GComboBox; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GTextField asTextField
+        {
+            get { return this as GTextField; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GRichTextField asRichTextField
+        {
+            get { return this as GRichTextField; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GTextInput asTextInput
+        {
+            get { return this as GTextInput; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GLoader asLoader
+        {
+            get { return this as GLoader; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GLoader3D asLoader3D
+        {
+            get { return this as GLoader3D; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GList asList
+        {
+            get { return this as GList; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GGraph asGraph
+        {
+            get { return this as GGraph; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GGroup asGroup
+        {
+            get { return this as GGroup; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GMovieClip asMovieClip
+        {
+            get { return this as GMovieClip; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GTree asTree
+        {
+            get { return this as GTree; }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public GTreeNode treeNode
+        {
+            get { return _treeNode; }
+        }
+
+        virtual protected void CreateDisplayObject()
+        {
+
+        }
+
+        internal void InternalSetParent(GComponent value)
+        {
+            parent = value;
+        }
+
+        virtual protected void HandlePositionChanged()
+        {
+            if (displayObject != null)
+            {
+                float xv = _x;
+                float yv = _y;
+                if (_pivotAsAnchor)
+                {
+                    xv -= _width * _pivotX;
+                    yv -= _height * _pivotY;
+                }
+                displayObject.node.Position = new Vector2(xv, yv);
+            }
+        }
+
+        virtual protected void HandleSizeChanged(bool fromNode)
+        {
+            if (displayObject != null && !fromNode)
+                displayObject.node.Size = new Vector2(_width, _height);
+        }
+
+        virtual protected void HandleScaleChanged()
+        {
+            if (displayObject != null)
+                displayObject.node.Scale = new Vector2(_scaleX, _scaleY);
+        }
+
+        virtual protected void HandleGrayedChanged()
+        {
+            if (displayObject != null)
+            {
+                var color = displayObject.node.Modulate;
+                color.R = 0.5f;
+                color.G = 0.5f;
+                color.B = 0.5f;
+                displayObject.node.Modulate = color;
+            }
+        }
+
+        virtual protected void HandleAlphaChanged()
+        {
+            if (displayObject != null)
+            {
+                var color = displayObject.node.Modulate;
+                color.A = _alpha;
+                displayObject.node.Modulate = color;
+            }
+        }
+
+        virtual internal protected void HandleVisibleChanged()
+        {
+            if (displayObject != null)
+                displayObject.visible = internalVisible2;
+        }
+
+        virtual public void ConstructFromResource()
+        {
+        }
+
+        protected NContainer AddParentContainer(Control node)
+        {
+            var parent = new NContainer(this);
+            parent.Size = node.Size;
+            parent.Scale = node.Scale;
+            parent.Rotation = node.Rotation;
+            parent.Position = node.Position;
+            node.Scale = Vector2.One;
+            node.Rotation = 0;
+            node.Position = Vector2.Zero;
+            if (node.GetParent() != null)
+                node.AddSibling(parent);
+            parent.AddChild(node);
+            return parent;
+        }
+
+        public virtual GObject HitTest(Vector2 viewPoint)
+        {
+            if (displayObject == null)
+                return null;
+            if (!_touchable || !visible || !internalVisible)
+                return null;
+            var localPoint = ViewportToLocal(viewPoint);
+            if (localPoint.X < 0 || localPoint.Y < 0 || localPoint.X > _width || localPoint.Y > _height)
+                return null;
+            return this;
+        }
+
+        virtual public void Setup_BeforeAdd(ByteBuffer buffer, int beginPos)
+        {
+            buffer.Seek(beginPos, 0);
+            buffer.Skip(5);
+
+            id = buffer.ReadS();
+            name = buffer.ReadS();
+            float f1 = buffer.ReadInt();
+            float f2 = buffer.ReadInt();
+            SetXY(f1, f2);
+
+            if (buffer.ReadBool())
+            {
+                initWidth = buffer.ReadInt();
+                initHeight = buffer.ReadInt();
+                SetSize(initWidth, initHeight, true, false);
+            }
+
+            if (buffer.ReadBool())
+            {
+                minWidth = buffer.ReadInt();
+                maxWidth = buffer.ReadInt();
+                minHeight = buffer.ReadInt();
+                maxHeight = buffer.ReadInt();
+            }
+
+            if (buffer.ReadBool())
+            {
+                f1 = buffer.ReadFloat();
+                f2 = buffer.ReadFloat();
+                SetScale(f1, f2);
+            }
+
+            if (buffer.ReadBool())
+            {
+                skewX = buffer.ReadFloat();
+                skewY = buffer.ReadFloat();
+            }
+
+            if (buffer.ReadBool())
+            {
+                f1 = buffer.ReadFloat();
+                f2 = buffer.ReadFloat();
+                SetPivot(f1, f2, buffer.ReadBool());
+            }
+
+            f1 = buffer.ReadFloat();
+            if (f1 != 1)
+                this.alpha = f1;
+
+            f1 = buffer.ReadFloat();
+            if (f1 != 0)
+                this.rotation = f1;
+
+            if (!buffer.ReadBool())
+                this.visible = false;
+            if (!buffer.ReadBool())
+                this.touchable = false;
+            if (buffer.ReadBool())
+                this.grayed = true;
+            this.blendMode = (BlendMode)buffer.ReadByte();
+
+            int filter = buffer.ReadByte();
+            if (filter == 1)
+            {
+                // ColorFilter cf = new ColorFilter();
+                // this.filter = cf;
+
+                // cf.AdjustBrightness(buffer.ReadFloat());
+                // cf.AdjustContrast(buffer.ReadFloat());
+                // cf.AdjustSaturation(buffer.ReadFloat());
+                // cf.AdjustHue(buffer.ReadFloat());
+
+                buffer.ReadFloat();
+                buffer.ReadFloat();
+                buffer.ReadFloat();
+                buffer.ReadFloat();
+            }
+
+            string str = buffer.ReadS();
+            if (str != null)
+                this.data = str;
+        }
+
+        virtual public void Setup_AfterAdd(ByteBuffer buffer, int beginPos)
+        {
+            buffer.Seek(beginPos, 1);
+
+            string str = buffer.ReadS();
+            if (str != null)
+                this.tooltips = str;
+
+            int groupId = buffer.ReadShort();
+            if (groupId >= 0)
+                group = parent.GetChildAt(groupId) as GGroup;
+
+            buffer.Seek(beginPos, 2);
+
+            int cnt = buffer.ReadShort();
+            for (int i = 0; i < cnt; i++)
+            {
+                int nextPos = buffer.ReadUshort();
+                nextPos += buffer.position;
+
+                GearBase gear = GetGear(buffer.ReadByte());
+                gear.Setup(buffer);
+
+                buffer.position = nextPos;
+            }
+        }
+
+        #region Drag support
+        Vector2 _dragTouchStartPos;
+        bool _dragTesting;
+
+        static Vector2 sGlobalDragStart = new Vector2();
+        static Rect sGlobalRect = new Rect();
+        static bool sUpdateInDragging = false;
+
+        private void InitDrag()
+        {
+            if (_draggable)
+            {
+                onTouchBegin.Add(__touchBegin);
+                onTouchMove.Add(__touchMove);
+                onTouchEnd.Add(__touchEnd);
+            }
+            else
+            {
+                onTouchBegin.Remove(__touchBegin);
+                onTouchMove.Remove(__touchMove);
+                onTouchEnd.Remove(__touchEnd);
+            }
+        }
+
+        private void DragBegin(int touchId)
+        {
+            if (DispatchEvent("onDragStart", touchId))
+                return;
+
+            if (draggingObject != null)
+            {
+                GObject tmp = draggingObject;
+                draggingObject.StopDrag();
+                draggingObject = null;
+                tmp.DispatchEvent("onDragEnd", null);
+            }
+
+            onTouchMove.Add(__touchMove);
+            onTouchEnd.Add(__touchEnd);
+
+            sGlobalDragStart = Stage.inst.GetTouchPosition(touchId);
+            sGlobalRect = this.LocalToGlobal(new Rect(0, 0, this.width, this.height));
+            _dragTesting = false;
+
+            draggingObject = this;
+            Stage.inst.AddTouchMonitor(touchId, this);
+        }
+
+        private void DragEnd()
+        {
+            if (draggingObject == this)
+            {
+                _dragTesting = false;
+                draggingObject = null;
+            }
+        }
+
+        private void __touchBegin(EventContext context)
+        {
+            // if ((Stage.inst.focus is InputTextField) && ((InputTextField)Stage.inst.focus).editable)
+            // {
+            //     _dragTesting = false;
+            //     return;
+            // }
+
+            NInputEvent evt = context.inputEvent;
+            _dragTouchStartPos = evt.position;
+            _dragTesting = true;
+            context.CaptureTouch();
+        }
+
+        private void __touchMove(EventContext context)
+        {
+            NInputEvent evt = context.inputEvent;
+
+            if (_dragTesting && draggingObject != this)
+            {
+                int sensitivity;
+                if (Stage.touchScreen)
+                    sensitivity = UIConfig.touchDragSensitivity;
+                else
+                    sensitivity = UIConfig.clickDragSensitivity;
+                if (Mathf.Abs(_dragTouchStartPos.X - evt.x) < sensitivity
+                    && Mathf.Abs(_dragTouchStartPos.Y - evt.y) < sensitivity)
+                    return;
+
+                _dragTesting = false;
+                DragBegin(evt.touchId);
+            }
+
+            if (draggingObject == this)
+            {
+                float xx = evt.x - sGlobalDragStart.X + sGlobalRect.X;
+                float yy = evt.y - sGlobalDragStart.Y + sGlobalRect.Y;
+
+                if (dragBounds != null)
+                {
+                    Rect rect = GRoot.inst.LocalToGlobal((Rect)dragBounds);
+                    if (xx < rect.X)
+                        xx = rect.X;
+                    else if (xx + sGlobalRect.width > rect.xMax)
+                    {
+                        xx = rect.xMax - sGlobalRect.width;
+                        if (xx < rect.X)
+                            xx = rect.X;
+                    }
+
+                    if (yy < rect.Y)
+                        yy = rect.Y;
+                    else if (yy + sGlobalRect.height > rect.yMax)
+                    {
+                        yy = rect.yMax - sGlobalRect.height;
+                        if (yy < rect.Y)
+                            yy = rect.Y;
+                    }
+                }
+
+                Vector2 pt = this.parent.GlobalToLocal(new Vector2(xx, yy));
+                if (float.IsNaN(pt.X))
+                    return;
+
+                sUpdateInDragging = true;
+                this.SetXY(Mathf.RoundToInt(pt.X), Mathf.RoundToInt(pt.Y));
+                sUpdateInDragging = false;
+
+                DispatchEvent("onDragMove", null);
+            }
+        }
+
+        private void __touchEnd(EventContext context)
+        {
+            if (draggingObject == this)
+            {
+                draggingObject = null;
+                DispatchEvent("onDragEnd", null);
+            }
+        }
+        #endregion
+
+        #region Tween Helpers
+        public GTweener TweenMove(Vector2 endValue, float duration)
+        {
+            return GTween.To(this.xy, endValue, duration).SetTarget(this, TweenPropType.XY);
+        }
+
+        public GTweener TweenMoveX(float endValue, float duration)
+        {
+            return GTween.To(_x, endValue, duration).SetTarget(this, TweenPropType.X);
+        }
+
+        public GTweener TweenMoveY(float endValue, float duration)
+        {
+            return GTween.To(_y, endValue, duration).SetTarget(this, TweenPropType.Y);
+        }
+
+        public GTweener TweenScale(Vector2 endValue, float duration)
+        {
+            return GTween.To(this.scale, endValue, duration).SetTarget(this, TweenPropType.Scale);
+        }
+
+        public GTweener TweenScaleX(float endValue, float duration)
+        {
+            return GTween.To(_scaleX, endValue, duration).SetTarget(this, TweenPropType.ScaleX);
+        }
+
+        public GTweener TweenScaleY(float endValue, float duration)
+        {
+            return GTween.To(_scaleY, endValue, duration).SetTarget(this, TweenPropType.ScaleY);
+        }
+
+        public GTweener TweenResize(Vector2 endValue, float duration)
+        {
+            return GTween.To(this.size, endValue, duration).SetTarget(this, TweenPropType.Size);
+        }
+
+        public GTweener TweenFade(float endValue, float duration)
+        {
+            return GTween.To(_alpha, endValue, duration).SetTarget(this, TweenPropType.Alpha);
+        }
+
+        public GTweener TweenRotate(float endValue, float duration)
+        {
+            return GTween.To(_rotation, endValue, duration).SetTarget(this, TweenPropType.Rotation);
+        }
+        #endregion
+    }
+}
+

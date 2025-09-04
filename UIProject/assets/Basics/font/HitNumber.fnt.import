@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://bwc6rpaaf5w34"
+path="res://.godot/imported/HitNumber.fnt-8eea7c5da4692f39522afb19d24e0bad.fontdata"
+
+[deps]
+
+source_file="res://UIProject/assets/Basics/font/HitNumber.fnt"
+dest_files=["res://.godot/imported/HitNumber.fnt-8eea7c5da4692f39522afb19d24e0bad.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component size="140,85" extention="Button">
+  <displayList>
+    <graph id="n7" name="n7" xy="0,0" size="140,87" type="rect" lineSize="0" fillColor="#ff666666"/>
+    <text id="n8" name="title" xy="37,23" size="65,39" fontSize="28" color="#ffffff" align="center" text="Stick">
+      <relation target="" sidePair="center-center,middle-middle"/>
+    </text>
+  </displayList>
+  <Button/>
+</component>

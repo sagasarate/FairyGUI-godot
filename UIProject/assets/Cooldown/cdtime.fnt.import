@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://chro42i6l0uan"
+path="res://.godot/imported/cdtime.fnt-9bca63944eae9b0c865e41bfb173934c.fontdata"
+
+[deps]
+
+source_file="res://UIProject/assets/Cooldown/cdtime.fnt"
+dest_files=["res://.godot/imported/cdtime.fnt-9bca63944eae9b0c865e41bfb173934c.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2

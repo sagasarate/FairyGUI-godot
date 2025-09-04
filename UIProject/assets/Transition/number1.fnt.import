@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://gsr77cxpug1o"
+path="res://.godot/imported/number1.fnt-de2c203c87e857a4a145b10e1f565377.fontdata"
+
+[deps]
+
+source_file="res://UIProject/assets/Transition/number1.fnt"
+dest_files=["res://.godot/imported/number1.fnt-de2c203c87e857a4a145b10e1f565377.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2

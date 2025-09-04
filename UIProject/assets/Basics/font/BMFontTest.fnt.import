@@ -1,0 +1,16 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://os4cs640sj3w"
+valid=false
+
+[deps]
+
+source_file="res://UIProject/assets/Basics/font/BMFontTest.fnt"
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2
