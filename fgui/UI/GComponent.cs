@@ -51,6 +51,8 @@ namespace FairyGUI
         EventListener _onDrop;
         bool _tabStopChildren = false;
         bool _opaque = false;
+        GObject _mask;
+        bool _reversedMask = false;
 
         public GComponent()
         {
@@ -132,6 +134,37 @@ namespace FairyGUI
         {
             get { return _opaque; }
             set { _opaque = value; }
+        }
+
+        /// <summary>
+        ///遮罩子对象的索引
+        /// </summary>
+        public int mask
+        {
+            get { return GetChildIndex(_mask); }
+            set
+            {
+                _mask = GetChildAt(value);
+                if (_mask != null)
+                {
+                    container.mask = _mask.displayObject.node;
+                    container.reversedMask = _reversedMask;
+                }
+                else
+                {
+                    container.mask = null;
+                }
+            }
+        }
+
+        public bool reversedMask
+        {
+            get { return _reversedMask; }
+            set
+            {
+                _reversedMask = value;
+                container.reversedMask = _reversedMask;
+            }
         }
 
         /// <summary>
@@ -442,7 +475,7 @@ namespace FairyGUI
             if (index >= 0 && index < numChildren)
                 return _children[index];
             else
-                throw new Exception("Invalid child index: " + index + ">" + numChildren);
+                return null;
         }
 
         public GObject GetInternalChildAt(int index)
@@ -450,7 +483,7 @@ namespace FairyGUI
             if (index >= 0 && index < numInternalChildren)
                 return _internalChildren[index].child;
             else
-                throw new Exception("Invalid child index: " + index + ">" + numChildren);
+                return null;
         }
 
         /// <summary>
@@ -1113,7 +1146,7 @@ namespace FairyGUI
                 }
 
                 UpdateClipRect();
-                container.Position = new Vector2(_margin.left, _margin.top);
+                container.position = new Vector2(_margin.left, _margin.top);
             }
             else if (_margin.left != 0 || _margin.top != 0)
             {
@@ -1121,7 +1154,7 @@ namespace FairyGUI
                 {
                     displayObject = AddParentContainer(container);
                 }
-                container.Position = new Vector2(_margin.left, _margin.top);
+                container.position = new Vector2(_margin.left, _margin.top);
             }
         }
 
@@ -1133,7 +1166,7 @@ namespace FairyGUI
             {
                 float w = this.width - (_margin.left + _margin.right);
                 float h = this.height - (_margin.top + _margin.bottom);
-                _clipContainer.Position = new Vector2(_margin.left, _margin.top);
+                _clipContainer.position = new Vector2(_margin.left, _margin.top);
                 _clipContainer.Size = new Vector2(w, h);
             }
         }
@@ -1384,14 +1417,27 @@ namespace FairyGUI
             }
         }
 
-        public override GObject HitTest(Vector2 viewPoint)
+        public override GObject HitTest(Vector2 viewPoint, bool forceTest = false)
         {
-            if (!touchable || !visible || !internalVisible)
+            if (!forceTest && (!touchable || !visible || !internalVisible))
                 return null;
             Vector2 localPoint = ViewportToLocal(viewPoint);
             bool OutContent = localPoint.X < 0 || localPoint.Y < 0 || localPoint.X > _width || localPoint.Y > _height;
             if ((_overflow != OverflowType.Visible) && OutContent)
                 return null;
+            if (_mask != null)
+            {
+                if (_reversedMask)
+                {
+                    if (_mask.HitTest(viewPoint, true) != null)
+                        return null;
+                }
+                else
+                {
+                    if (_mask.HitTest(viewPoint, true) == null)
+                        return null;
+                }
+            }
             int cnt = _internalChildren.Count;
             for (int i = cnt - 1; i >= 0; i--)
             {
@@ -1411,13 +1457,13 @@ namespace FairyGUI
             if (!_opaque)
                 return null;
             if (_hitArea != null)
-                {
-                    Rect rect = Rect.zero;
-                    rect.width = _width;
-                    rect.height = _height;
-                    if (!_hitArea.HitTest(rect, localPoint))
-                        return null;
-                }
+            {
+                Rect rect = Rect.zero;
+                rect.width = _width;
+                rect.height = _height;
+                if (!_hitArea.HitTest(rect, localPoint))
+                    return null;
+            }
             if (OutContent)
                 return null;
             return this;
@@ -1609,10 +1655,9 @@ namespace FairyGUI
             int maskId = buffer.ReadShort();
             if (maskId != -1)
             {
-                //container.mask = GetChildAt(maskId).displayObject;
-                // if (buffer.ReadBool())
-                //     container.reversedMask = true;
-                buffer.Skip(1);
+                mask = maskId;
+                if (buffer.ReadBool())
+                    reversedMask = true;
             }
 
             {

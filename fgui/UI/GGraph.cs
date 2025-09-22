@@ -186,6 +186,17 @@ namespace FairyGUI
             this.SetSize(aWidth, aHeight);
             _shape.DrawPolygon(points, fillColor, lineSize, lineColor);
         }
+        public override GObject HitTest(Vector2 viewPoint, bool forceTest = false)
+        {
+            if (displayObject == null)
+                return null;
+            if (!forceTest && (!touchable || !visible || !internalVisible))
+                return null;
+            var localPoint = ViewportToLocal(viewPoint);
+            if (!_shape.HitTest(new Rect(0, 0, _width, _height), localPoint))
+                return null;
+            return this;
+        }
 
         override public void Setup_BeforeAdd(ByteBuffer buffer, int beginPos)
         {

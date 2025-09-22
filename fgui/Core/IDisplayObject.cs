@@ -11,6 +11,7 @@ namespace FairyGUI
         bool visible { get; set; }
         float skewX { get; set; }
         float skewY { get; set; }
+        Vector2 position { get; set; }
         BlendMode blendMode { get; set; }
         event System.Action<double> onUpdate;
     }

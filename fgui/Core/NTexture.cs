@@ -230,6 +230,11 @@ namespace FairyGUI
         //         _region.width / _nativeTexture.width, _region.height / _nativeTexture.height);
         // }
 
+        public Rect region
+        {
+            get { return _region; }
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -367,7 +372,7 @@ namespace FairyGUI
         /// <summary>
         /// 
         /// </summary>
-        
+
 
         /// <summary>
         /// 
@@ -457,7 +462,7 @@ namespace FairyGUI
             _alphaTexture = null;
         }
 
-        
+
 
         public void AddRef()
         {

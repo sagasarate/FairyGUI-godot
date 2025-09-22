@@ -1055,7 +1055,7 @@ namespace FairyGUI
             mx += _owner._alignOffset.X;
             my += _owner._alignOffset.Y;
 
-            _maskContainer.Position = new Vector2(mx, my);
+            _maskContainer.position = new Vector2(mx, my);
         }
 
         void SetSize(float aWidth, float aHeight)
@@ -1157,7 +1157,7 @@ namespace FairyGUI
                     pos.X -= deltaPosX;
                     _tweenStart.X -= deltaPosX;
                     _xPos = -pos.X;
-                    _container.Position = pos;
+                    _container.position = pos;
                 }
                 if (deltaPosY != 0)
                 {
@@ -1165,7 +1165,7 @@ namespace FairyGUI
                     pos.Y -= deltaPosY;
                     _tweenStart.Y -= deltaPosY;
                     _yPos = -pos.Y;
-                    _container.Position = pos;
+                    _container.position = pos;
                 }
             }
             else if (_dragged)
@@ -1176,7 +1176,7 @@ namespace FairyGUI
                     pos.X -= deltaPosX;
                     _containerPos.X -= deltaPosX;
                     _xPos = -pos.X;
-                    _container.Position = pos;
+                    _container.position = pos;
                 }
                 if (deltaPosY != 0)
                 {
@@ -1184,7 +1184,7 @@ namespace FairyGUI
                     pos.Y -= deltaPosY;
                     _containerPos.Y -= deltaPosY;
                     _yPos = -pos.Y;
-                    _container.Position = pos;
+                    _container.position = pos;
                 }
             }
             else
@@ -1195,7 +1195,7 @@ namespace FairyGUI
                     Vector2 pos = _container.Position;
                     _xPos = _overlapSize.X;
                     pos.X = -_xPos;
-                    _container.Position = pos;
+                    _container.position = pos;
                 }
 
                 if (deltaHeight != 0 && isBottom)
@@ -1203,7 +1203,7 @@ namespace FairyGUI
                     Vector2 pos = _container.Position;
                     _yPos = _overlapSize.Y;
                     pos.Y = -_yPos;
-                    _container.Position = pos;
+                    _container.position = pos;
                 }
             }
 
@@ -1286,9 +1286,9 @@ namespace FairyGUI
             else
                 max += _footerLockedSize;
             if (_refreshBarAxis == 0)
-                _container.Position = new Vector2(Mathf.Clamp(_container.Position.X, -max, _headerLockedSize), Mathf.Clamp(_container.Position.Y, -_overlapSize.Y, 0));
+                _container.position = new Vector2(Mathf.Clamp(_container.Position.X, -max, _headerLockedSize), Mathf.Clamp(_container.Position.Y, -_overlapSize.Y, 0));
             else
-                _container.Position = new Vector2(Mathf.Clamp(_container.Position.X, -_overlapSize.X, 0), Mathf.Clamp(_container.Position.Y, -max, _headerLockedSize));
+                _container.position = new Vector2(Mathf.Clamp(_container.Position.X, -_overlapSize.X, 0), Mathf.Clamp(_container.Position.Y, -max, _headerLockedSize));
 
             if (_header != null)
             {
@@ -1368,7 +1368,7 @@ namespace FairyGUI
                 {
                     if (_container.Position.X != 0)
                     {
-                        _container.Position = new Vector2(0, _container.Position.Y);
+                        _container.position = new Vector2(0, _container.Position.Y);
                     }
 
                     pos.X = 0;
@@ -1378,7 +1378,7 @@ namespace FairyGUI
                 else
                 {
                     if (_container.Position.Y != 0)
-                        _container.Position = new Vector2(_container.Position.X, 0);
+                        _container.position = new Vector2(_container.Position.X, 0);
                     pos.Y = 0;
                 }
 
@@ -1397,7 +1397,7 @@ namespace FairyGUI
                 if (_tweening != 0)
                     KillTween();
 
-                _container.Position = new Vector2((int)-_xPos, (int)-_yPos);
+                _container.position = new Vector2((int)-_xPos, (int)-_yPos);
 
                 LoopCheckingCurrent();
             }
@@ -1571,7 +1571,7 @@ namespace FairyGUI
                     CurPos.X = newPos.X;
             }
             if (CurPos != _container.Position)
-                _container.Position = CurPos;
+                _container.position = CurPos;
 
             //更新速度
             float CurTime = Time.GetTicksMsec() / 1000.0f;
@@ -1861,7 +1861,7 @@ namespace FairyGUI
             }
 
             if (changed)
-                _container.Position = new Vector2((int)-_xPos, (int)-_yPos);
+                _container.position = new Vector2((int)-_xPos, (int)-_yPos);
 
             return changed;
         }
@@ -1940,7 +1940,7 @@ namespace FairyGUI
                     CurPos.X = -(int)pos;
                 else
                     CurPos.Y = -(int)pos;
-                _container.Position = CurPos;
+                _container.position = CurPos;
             }
         }
 
@@ -2138,7 +2138,7 @@ namespace FairyGUI
         {
             if (_tweening == 1) //取消类型为1的tween需立刻设置到终点
             {
-                _container.Position = _tweenStart + _tweenChange;
+                _container.position = _tweenStart + _tweenChange;
                 _onScroll.Call();
             }
 
@@ -2224,7 +2224,7 @@ namespace FairyGUI
             float nx = RunTween(0, delta);
             float ny = RunTween(1, delta);
 
-            _container.Position = new Vector2(nx, ny);
+            _container.position = new Vector2(nx, ny);
 
             if (_tweening == 2)
             {

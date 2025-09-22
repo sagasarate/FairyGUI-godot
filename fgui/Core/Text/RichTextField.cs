@@ -22,6 +22,7 @@ namespace FairyGUI
         public bool visible { get { return Visible; } set { Visible = value; } }
         public float skewX { get; set; }
         public float skewY { get; set; }
+        public Vector2 position { get { return Position; } set { Position = value; } }
         public BlendMode blendMode { get; set; }
         public event System.Action<double> onUpdate;
         public RichTextField(GObject owner)

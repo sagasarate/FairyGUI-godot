@@ -8,6 +8,12 @@ namespace FairyGUI
     /// </summary>
     public partial class NImage : Control, IDisplayObject
     {
+        public enum ReverseType
+        {
+            None,
+            All,
+            OnlyColor,
+        }
         protected float _skewX = 0;
         protected float _skewY = 0;
         protected Rect? _scale9Grid;
@@ -20,11 +26,15 @@ namespace FairyGUI
         protected float _fillAmount = 1f;
         protected bool _fillClockwise = true;
         protected NTexture _texture;
+        protected Texture2D _reverseTexture;
         protected CanvasItemMaterial _material;
         protected ArrayMesh _mesh;
+        protected ArrayMesh _outBoundMesh;
         protected SurfaceTool _surfaceTool;
+        internal NContainer maskOwner;
+        internal bool reverseMask = false;
 
-
+        static Color outColor = Colors.White;
 
         public GObject gOwner { get; set; }
         public IDisplayObject parent { get { return GetParent() as IDisplayObject; } }
@@ -54,7 +64,16 @@ namespace FairyGUI
                 }
             }
         }
-
+        public Vector2 position
+        {
+            get { return Position; }
+            set
+            {
+                Position = value;
+                if (maskOwner != null)
+                    QueueRedraw();
+            }
+        }
         public BlendMode blendMode
         {
             get
@@ -117,6 +136,7 @@ namespace FairyGUI
             MouseFilter = MouseFilterEnum.Ignore;
             _material = new CanvasItemMaterial();
             _material.LightMode = CanvasItemMaterial.LightModeEnum.Unshaded;
+            Material = _material;
             _mesh = new ArrayMesh();
             _surfaceTool = new SurfaceTool();
         }
@@ -127,6 +147,24 @@ namespace FairyGUI
             {
                 UpdateTexture(value);
             }
+        }
+        public Texture2D drawTexture
+        {
+            get
+            {
+                if (reverseMask)
+                    return _reverseTexture;
+                else
+                    return _texture?.nativeTexture;
+            }
+        }
+        public ArrayMesh mesh
+        {
+            get { return _mesh; }
+        }
+        public ArrayMesh outBoundMesh
+        {
+            get { return _outBoundMesh; }
         }
         public Vector2 textureScale
         {
@@ -266,7 +304,7 @@ namespace FairyGUI
             QueueRedraw();
         }
 
-        public void BuildMesh(SurfaceTool surfaceTool)
+        public void UpdateMesh()
         {
             if (_texture == null)
             {
@@ -275,9 +313,28 @@ namespace FairyGUI
             _mesh.ClearSurfaces();
             _surfaceTool.Clear();
             _surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
+
+            bool reserveDraw = maskOwner != null && reverseMask;
+            int vertexCount = 0;
+
             Rect vertRect = new Rect(Vector2.Zero, Size);
-            vertRect = _texture.GetDrawRect(vertRect, _flip);
             Rect uvRect = _texture.uvRect;
+            TextureRepeat = TextureRepeatEnum.Disabled;
+
+            if (reserveDraw && _texture != null)
+            {
+                Rect textRect = _texture.region;
+                _reverseTexture = ToolSet.ExtractAndInvertAlpha(_texture.nativeTexture, new Rect2I((int)textRect.xMin, (int)textRect.yMin, (int)textRect.width, (int)textRect.height));
+                uvRect.xMin = 0;
+                uvRect.yMin = 0;
+                uvRect.width = 1;
+                uvRect.height = 1;
+            }
+            else
+            {
+                vertRect = _texture.GetDrawRect(vertRect, _flip);
+            }
+
             if (_flip != FlipType.None)
             {
                 if (_flip == FlipType.Horizontal || _flip == FlipType.Both)
@@ -299,23 +356,23 @@ namespace FairyGUI
                 switch (_fillMethod)
                 {
                     case FillMethod.Horizontal:
-                        FillHorizontal(surfaceTool, vertRect, uvRect, _fillOrigin, _fillAmount);
+                        vertexCount += FillHorizontal(_surfaceTool, vertRect, uvRect, _fillOrigin, _fillAmount, vertexCount);
                         break;
 
                     case FillMethod.Vertical:
-                        FillVertical(surfaceTool, vertRect, uvRect, _fillOrigin, _fillAmount);
+                        vertexCount += FillVertical(_surfaceTool, vertRect, uvRect, _fillOrigin, _fillAmount, vertexCount);
                         break;
 
                     case FillMethod.Radial90:
-                        FillRadial90(surfaceTool, vertRect, uvRect, (Origin90)_fillOrigin, _fillAmount, _fillClockwise, 0);
+                        vertexCount += FillRadial90(_surfaceTool, vertRect, uvRect, (Origin90)_fillOrigin, _fillAmount, _fillClockwise, vertexCount);
                         break;
 
                     case FillMethod.Radial180:
-                        FillRadial180(surfaceTool, vertRect, uvRect, (Origin180)_fillOrigin, _fillAmount, _fillClockwise, 0);
+                        vertexCount += FillRadial180(_surfaceTool, vertRect, uvRect, (Origin180)_fillOrigin, _fillAmount, _fillClockwise, vertexCount);
                         break;
 
                     case FillMethod.Radial360:
-                        FillRadial360(surfaceTool, vertRect, uvRect, (Origin360)_fillOrigin, _fillAmount, _fillClockwise, 0);
+                        vertexCount += FillRadial360(_surfaceTool, vertRect, uvRect, (Origin360)_fillOrigin, _fillAmount, _fillClockwise, vertexCount);
                         break;
                 }
             }
@@ -327,7 +384,8 @@ namespace FairyGUI
                     TextureRepeat = TextureRepeatEnum.Enabled;
                     uvRect.width *= vertRect.width / texture.width * _textureScale.X;
                     uvRect.height *= vertRect.height / texture.height * _textureScale.Y;
-                    ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, 0);
+                    ToolSet.MeshAddRect(_surfaceTool, vertRect, uvRect, 0);
+                    vertexCount += 4;
                 }
                 else
                 {
@@ -335,26 +393,116 @@ namespace FairyGUI
                     contentRect.width *= _textureScale.X;
                     contentRect.height *= _textureScale.Y;
 
-                    TileFill(surfaceTool, contentRect, uvRect, texture.width, texture.height, 0);
+                    vertexCount += TileFill(_surfaceTool, contentRect, uvRect, texture.width, texture.height, 0);
                 }
             }
             else if (_scale9Grid != null)
             {
-                SliceFill(surfaceTool, vertRect, uvRect, texture.width, texture.height);
+                vertexCount += SliceFill(_surfaceTool, vertRect, uvRect, texture.width, texture.height);
             }
             else
             {
-                ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, 0);
+                ToolSet.MeshAddRect(_surfaceTool, vertRect, uvRect, 0);
+                vertexCount += 4;
             }
 
             _surfaceTool.GenerateNormals();
-            if (_material != null)
-                _surfaceTool.SetMaterial(_material);
+            // if (_material != null)
+            //     _surfaceTool.SetMaterial(_material);
             _surfaceTool.Commit(_mesh);
+
+            if (reserveDraw)
+            {
+                if (_outBoundMesh == null)
+                    _outBoundMesh = new ArrayMesh();
+                else
+                    _outBoundMesh.ClearSurfaces();
+                _surfaceTool.Clear();
+                _surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
+                vertexCount = 0;
+                if (_fillMethod != FillMethod.None)
+                {
+                    switch (_fillMethod)
+                    {
+                        case FillMethod.Horizontal:
+                            vertexCount += FillHorizontal(_surfaceTool, vertRect, uvRect, _fillOrigin, _fillAmount, vertexCount, ReverseType.All);
+                            break;
+
+                        case FillMethod.Vertical:
+                            vertexCount += FillVertical(_surfaceTool, vertRect, uvRect, _fillOrigin, _fillAmount, vertexCount, ReverseType.All);
+                            break;
+
+                        case FillMethod.Radial90:
+                            vertexCount += FillRadial90(_surfaceTool, vertRect, uvRect, (Origin90)_fillOrigin, _fillAmount, _fillClockwise, vertexCount, ReverseType.All);
+                            break;
+
+                        case FillMethod.Radial180:
+                            vertexCount += FillRadial180(_surfaceTool, vertRect, uvRect, (Origin180)_fillOrigin, _fillAmount, _fillClockwise, vertexCount, ReverseType.All);
+                            break;
+
+                        case FillMethod.Radial360:
+                            vertexCount += FillRadial360(_surfaceTool, vertRect, uvRect, (Origin360)_fillOrigin, _fillAmount, _fillClockwise, vertexCount, ReverseType.All);
+                            break;
+                    }
+                }
+                DrawOutBound(vertexCount);
+                _surfaceTool.GenerateNormals();
+                _surfaceTool.Commit(_outBoundMesh);
+            }
         }
 
-        void FillHorizontal(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, int origin, float amount)
+        Rect MakeOutRect(float offsetX = 0, float offsetY = 0)
         {
+            if (maskOwner == null)
+                return new Rect(-offsetX, -offsetY, Size.X + offsetX * 2, Size.Y + offsetY * 2);
+            Transform2D Trans = GetTransform();
+            Vector2 min = Trans * new Vector2(-offsetX, -offsetY);
+            Vector2 max = Trans * (Size + new Vector2(offsetX, offsetY));
+            min.X = Mathf.Min(min.X, 0);
+            min.Y = Mathf.Min(min.Y, 0);
+            max.X = Mathf.Max(max.X, maskOwner.Size.X);
+            max.Y = Mathf.Max(max.Y, maskOwner.Size.Y);
+            Trans = GetTransform().AffineInverse();
+            min = Trans * min;
+            max = Trans * max;
+            return Rect.MinMaxRect(
+                Mathf.Min(min.X, max.X), Mathf.Min(min.Y, max.Y),
+                Mathf.Max(min.X, max.X), Mathf.Max(min.Y, max.Y));
+        }
+        void DrawOutBound(int vertexStart)
+        {
+            Rect rect = new Rect(Vector2.Zero, Size);
+            Rect outRect = MakeOutRect();
+            ToolSet.MeshAddVertex(_surfaceTool, rect.xMin, rect.yMin, outColor);
+            ToolSet.MeshAddVertex(_surfaceTool, rect.xMax, rect.yMin, outColor);
+            ToolSet.MeshAddVertex(_surfaceTool, rect.xMax, rect.yMax, outColor);
+            ToolSet.MeshAddVertex(_surfaceTool, rect.xMin, rect.yMax, outColor);
+            ToolSet.MeshAddVertex(_surfaceTool, outRect.xMin, outRect.yMin, outColor);
+            ToolSet.MeshAddVertex(_surfaceTool, outRect.xMax, outRect.yMin, outColor);
+            ToolSet.MeshAddVertex(_surfaceTool, outRect.xMax, outRect.yMax, outColor);
+            ToolSet.MeshAddVertex(_surfaceTool, outRect.xMin, outRect.yMax, outColor);
+            ToolSet.MeshAddTriangleIndecies(_surfaceTool, vertexStart, vertexStart + 4, vertexStart + 5);
+            ToolSet.MeshAddTriangleIndecies(_surfaceTool, vertexStart, vertexStart + 5, vertexStart + 1);
+            ToolSet.MeshAddTriangleIndecies(_surfaceTool, vertexStart + 1, vertexStart + 5, vertexStart + 6);
+            ToolSet.MeshAddTriangleIndecies(_surfaceTool, vertexStart + 1, vertexStart + 6, vertexStart + 2);
+            ToolSet.MeshAddTriangleIndecies(_surfaceTool, vertexStart + 2, vertexStart + 6, vertexStart + 7);
+            ToolSet.MeshAddTriangleIndecies(_surfaceTool, vertexStart + 2, vertexStart + 7, vertexStart + 3);
+            ToolSet.MeshAddTriangleIndecies(_surfaceTool, vertexStart + 3, vertexStart + 7, vertexStart + 4);
+            ToolSet.MeshAddTriangleIndecies(_surfaceTool, vertexStart + 3, vertexStart + 4, vertexStart + 0);
+        }
+
+        int FillHorizontal(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, int origin, float amount, int startIndex, ReverseType reverse = ReverseType.None)
+        {
+            if (reverse == ReverseType.All)
+            {
+                if ((OriginHorizontal)origin == OriginHorizontal.Right)
+                    origin = (int)OriginHorizontal.Left;
+                else
+                    origin = (int)OriginHorizontal.Right;
+                amount = 1.0f - amount;
+            }
+            if (amount <= 0)
+                return 0;
             float a = vertRect.width * amount;
             if ((OriginHorizontal)origin == OriginHorizontal.Right || (OriginVertical)origin == OriginVertical.Bottom)
                 vertRect.X += vertRect.width - a;
@@ -365,11 +513,25 @@ namespace FairyGUI
                 uvRect.X += uvRect.width - a;
             uvRect.width = a;
 
-            Utils.ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, 0);
+            if (reverse != ReverseType.None)
+                ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, startIndex, null, 0);
+            else
+                ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, startIndex);
+            return 4;
         }
 
-        void FillVertical(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, int origin, float amount)
+        int FillVertical(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, int origin, float amount, int startIndex, ReverseType reverse = ReverseType.None)
         {
+            if (reverse == ReverseType.All)
+            {
+                if ((OriginVertical)origin == OriginVertical.Bottom)
+                    origin = (int)OriginVertical.Top;
+                else
+                    origin = (int)OriginVertical.Bottom;
+                amount = 1.0f - amount;
+            }
+            if (amount <= 0)
+                return 0;
             float a = vertRect.height * amount;
             if ((OriginHorizontal)origin == OriginHorizontal.Right || (OriginVertical)origin == OriginVertical.Bottom)
                 vertRect.Y += vertRect.height - a;
@@ -380,11 +542,22 @@ namespace FairyGUI
                 uvRect.Y += uvRect.height - a;
             uvRect.height = a;
 
-            Utils.ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, 0);
+            if (reverse != ReverseType.None)
+                ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, startIndex, null, 0);
+            else
+                ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, startIndex);
+            return 4;
         }
 
-        int FillRadial90(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, Origin90 origin, float amount, bool clockwise, int StartIndex)
+        int FillRadial90(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, Origin90 origin, float amount, bool clockwise, int startIndex, ReverseType reverse = ReverseType.None)
         {
+            if (reverse == ReverseType.All)
+            {
+                clockwise = !clockwise;
+                amount = 1.0f - amount;
+            }
+            if (amount <= 0)
+                return 0;
             bool flipX = origin == Origin90.TopRight || origin == Origin90.BottomRight;
             bool flipY = origin == Origin90.BottomLeft || origin == Origin90.BottomRight;
             if (flipX != flipY)
@@ -410,78 +583,79 @@ namespace FairyGUI
             float xMax = flipX ? -vertRect.xMin : vertRect.xMax;
             float yMax = flipY ? -vertRect.yMin : vertRect.yMax;
 
-            ToolSet.MeshAddVertex(surfaceTool, xMin, yMin, vertRect, uvRect);
-            StartIndex++;
+
+            ToolSet.MeshAddVertex(surfaceTool, xMin, yMin, vertRect, uvRect, reverse != ReverseType.None ? outColor : null);
             if (clockwise)
             {
-                ToolSet.MeshAddVertex(surfaceTool, xMax, yMin, vertRect, uvRect);
-                StartIndex++;
+                ToolSet.MeshAddVertex(surfaceTool, xMax, yMin, vertRect, uvRect, reverse != ReverseType.None ? outColor : null);
             }
             if (y > vertRect.yMax)
             {
                 if (thresold)
                 {
-                    ToolSet.MeshAddVertex(surfaceTool, x2, yMax, vertRect, uvRect);
-                    StartIndex++;
+                    ToolSet.MeshAddVertex(surfaceTool, x2, yMax, vertRect, uvRect, reverse != ReverseType.None ? outColor : null);
                 }
                 else
                 {
-                    ToolSet.MeshAddVertex(surfaceTool, xMax, yMax, vertRect, uvRect);
-                    StartIndex++;
+                    ToolSet.MeshAddVertex(surfaceTool, xMax, yMax, vertRect, uvRect, reverse != ReverseType.None ? outColor : null);
                 }
             }
             else
             {
-                Utils.ToolSet.MeshAddVertex(surfaceTool, xMax, y2, vertRect, uvRect);
-                StartIndex++;
+                ToolSet.MeshAddVertex(surfaceTool, xMax, y2, vertRect, uvRect, reverse != ReverseType.None ? outColor : null);
             }
             if (x > vertRect.xMax)
             {
                 if (thresold)
                 {
-                    ToolSet.MeshAddVertex(surfaceTool, xMax, y2, vertRect, uvRect);
-                    StartIndex++;
+                    ToolSet.MeshAddVertex(surfaceTool, xMax, y2, vertRect, uvRect, reverse != ReverseType.None ? outColor : null);
                 }
                 else
                 {
-                    ToolSet.MeshAddVertex(surfaceTool, xMax, yMax, vertRect, uvRect);
-                    StartIndex++;
+                    ToolSet.MeshAddVertex(surfaceTool, xMax, yMax, vertRect, uvRect, reverse != ReverseType.None ? outColor : null);
                 }
             }
             else
             {
-                ToolSet.MeshAddVertex(surfaceTool, x2, yMax, vertRect, uvRect);
-                StartIndex++;
+                ToolSet.MeshAddVertex(surfaceTool, x2, yMax, vertRect, uvRect, reverse != ReverseType.None ? outColor : null);
             }
             if (!clockwise)
             {
-                ToolSet.MeshAddVertex(surfaceTool, xMin, yMax, vertRect, uvRect);
-                StartIndex++;
+                ToolSet.MeshAddVertex(surfaceTool, xMin, yMax, vertRect, uvRect, reverse != ReverseType.None ? outColor : null);
             }
             if (flipX == flipY)
             {
-                surfaceTool.AddIndex(0);
-                surfaceTool.AddIndex(1);
-                surfaceTool.AddIndex(2);
+                surfaceTool.AddIndex(startIndex);
+                surfaceTool.AddIndex(startIndex + 1);
+                surfaceTool.AddIndex(startIndex + 2);
 
-                surfaceTool.AddIndex(0);
-                surfaceTool.AddIndex(2);
-                surfaceTool.AddIndex(3);
+                surfaceTool.AddIndex(startIndex);
+                surfaceTool.AddIndex(startIndex + 2);
+                surfaceTool.AddIndex(startIndex + 3);
             }
             else
             {
-                surfaceTool.AddIndex(2);
-                surfaceTool.AddIndex(1);
-                surfaceTool.AddIndex(0);
+                surfaceTool.AddIndex(startIndex + 2);
+                surfaceTool.AddIndex(startIndex + 1);
+                surfaceTool.AddIndex(startIndex);
 
-                surfaceTool.AddIndex(3);
-                surfaceTool.AddIndex(2);
-                surfaceTool.AddIndex(0);
+                surfaceTool.AddIndex(startIndex + 3);
+                surfaceTool.AddIndex(startIndex + 2);
+                surfaceTool.AddIndex(startIndex);
             }
-            return StartIndex;
+            return 4;
         }
-        int FillRadial180(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, Origin180 origin, float amount, bool clockwise, int StartIndex)
+        int FillRadial180(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, Origin180 origin, float amount, bool clockwise, int StartIndex, ReverseType reverse = ReverseType.None)
         {
+            if (reverse == ReverseType.All)
+            {
+                clockwise = !clockwise;
+                amount = 1.0f - amount;
+                reverse = ReverseType.OnlyColor;
+            }
+            if (amount <= 0)
+                return 0;
+            int firstIndex = StartIndex;
             switch (origin)
             {
                 case Origin180.Top:
@@ -494,7 +668,7 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        StartIndex = FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.TopLeft : Origin90.TopRight, amount / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.TopLeft : Origin90.TopRight, amount / 0.5f, clockwise, StartIndex, reverse);
                     }
                     else
                     {
@@ -505,7 +679,7 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        StartIndex = FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.TopRight : Origin90.TopLeft, (amount - 0.5f) / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.TopRight : Origin90.TopLeft, (amount - 0.5f) / 0.5f, clockwise, StartIndex, reverse);
                         if (clockwise)
                         {
                             vertRect.X += vertRect.width;
@@ -516,7 +690,10 @@ namespace FairyGUI
                             vertRect.X -= vertRect.width;
                             uvRect.X -= uvRect.width;
                         }
-                        ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        if (reverse != ReverseType.None)
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, StartIndex, null, 0);
+                        else
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
                         StartIndex += 4;
                     }
                     break;
@@ -531,7 +708,7 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        StartIndex = FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.BottomRight : Origin90.BottomLeft, amount / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.BottomRight : Origin90.BottomLeft, amount / 0.5f, clockwise, StartIndex, reverse);
                     }
                     else
                     {
@@ -542,7 +719,7 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        StartIndex = FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.BottomLeft : Origin90.BottomRight, (amount - 0.5f) / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.BottomLeft : Origin90.BottomRight, (amount - 0.5f) / 0.5f, clockwise, StartIndex, reverse);
                         if (clockwise)
                         {
                             vertRect.X -= vertRect.width;
@@ -553,7 +730,10 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        if (reverse != ReverseType.None)
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, StartIndex, null, 0);
+                        else
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
                         StartIndex += 4;
                     }
                     break;
@@ -568,7 +748,7 @@ namespace FairyGUI
                             vertRect.Y += vertRect.height;
                             uvRect.Y += uvRect.height;
                         }
-                        StartIndex = FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.BottomLeft : Origin90.TopLeft, amount / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.BottomLeft : Origin90.TopLeft, amount / 0.5f, clockwise, StartIndex, reverse);
                     }
                     else
                     {
@@ -579,7 +759,7 @@ namespace FairyGUI
                             vertRect.Y += vertRect.height;
                             uvRect.Y += uvRect.height;
                         }
-                        StartIndex = FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.TopLeft : Origin90.BottomLeft, (amount - 0.5f) / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.TopLeft : Origin90.BottomLeft, (amount - 0.5f) / 0.5f, clockwise, StartIndex, reverse);
                         if (clockwise)
                         {
                             vertRect.Y -= vertRect.height;
@@ -590,7 +770,10 @@ namespace FairyGUI
                             vertRect.Y += vertRect.height;
                             uvRect.Y += uvRect.height;
                         }
-                        ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        if (reverse != ReverseType.None)
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, StartIndex, null, 0);
+                        else
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
                         StartIndex += 4;
                     }
                     break;
@@ -605,7 +788,7 @@ namespace FairyGUI
                             vertRect.Y += vertRect.height;
                             uvRect.Y += uvRect.height;
                         }
-                        StartIndex = FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.TopRight : Origin90.BottomRight, amount / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.TopRight : Origin90.BottomRight, amount / 0.5f, clockwise, StartIndex, reverse);
                     }
                     else
                     {
@@ -616,7 +799,7 @@ namespace FairyGUI
                             vertRect.Y += vertRect.height;
                             uvRect.Y += uvRect.height;
                         }
-                        StartIndex = FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.BottomRight : Origin90.TopRight, (amount - 0.5f) / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial90(surfaceTool, vertRect, uvRect, clockwise ? Origin90.BottomRight : Origin90.TopRight, (amount - 0.5f) / 0.5f, clockwise, StartIndex, reverse);
                         if (clockwise)
                         {
                             vertRect.Y += vertRect.height;
@@ -627,15 +810,27 @@ namespace FairyGUI
                             vertRect.Y -= vertRect.height;
                             uvRect.Y -= uvRect.height;
                         }
-                        ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        if (reverse != ReverseType.None)
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, StartIndex, null, 0);
+                        else
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
                         StartIndex += 4;
                     }
                     break;
             }
-            return StartIndex;
+            return StartIndex - firstIndex;
         }
-        int FillRadial360(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, Origin360 origin, float amount, bool clockwise, int StartIndex)
+        int FillRadial360(SurfaceTool surfaceTool, Rect vertRect, Rect uvRect, Origin360 origin, float amount, bool clockwise, int StartIndex, ReverseType reverse = ReverseType.None)
         {
+            if (reverse == ReverseType.All)
+            {
+                clockwise = !clockwise;
+                amount = 1.0f - amount;
+                reverse = ReverseType.OnlyColor;
+            }
+            if (amount <= 0)
+                return 0;
+            int firstIndex = StartIndex;
             switch (origin)
             {
                 case Origin360.Top:
@@ -648,7 +843,7 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        StartIndex = FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Left : Origin180.Right, amount / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Left : Origin180.Right, amount / 0.5f, clockwise, StartIndex, reverse);
                     }
                     else
                     {
@@ -659,7 +854,7 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        StartIndex = FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Right : Origin180.Left, (amount - 0.5f) / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Right : Origin180.Left, (amount - 0.5f) / 0.5f, clockwise, StartIndex, reverse);
                         if (clockwise)
                         {
                             vertRect.X += vertRect.width;
@@ -670,7 +865,11 @@ namespace FairyGUI
                             vertRect.X -= vertRect.width;
                             uvRect.X -= uvRect.width;
                         }
-                        ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        if (reverse != ReverseType.None)
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, StartIndex, null, 0);
+                        else
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        StartIndex += 4;
                     }
                     break;
                 case Origin360.Bottom:
@@ -683,7 +882,7 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        StartIndex = FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Right : Origin180.Left, amount / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Right : Origin180.Left, amount / 0.5f, clockwise, StartIndex, reverse);
                     }
                     else
                     {
@@ -694,7 +893,7 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        StartIndex = FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Left : Origin180.Right, (amount - 0.5f) / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Left : Origin180.Right, (amount - 0.5f) / 0.5f, clockwise, StartIndex, reverse);
                         if (clockwise)
                         {
                             vertRect.X -= vertRect.width;
@@ -705,7 +904,11 @@ namespace FairyGUI
                             vertRect.X += vertRect.width;
                             uvRect.X += uvRect.width;
                         }
-                        ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        if (reverse != ReverseType.None)
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, StartIndex, null, 0);
+                        else
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        StartIndex += 4;
                     }
                     break;
 
@@ -719,7 +922,7 @@ namespace FairyGUI
                             vertRect.Y += vertRect.height;
                             uvRect.Y += uvRect.height;
                         }
-                        StartIndex = FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Bottom : Origin180.Top, amount / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Bottom : Origin180.Top, amount / 0.5f, clockwise, StartIndex, reverse);
                     }
                     else
                     {
@@ -730,7 +933,7 @@ namespace FairyGUI
                             vertRect.Y += vertRect.height;
                             uvRect.Y += uvRect.height;
                         }
-                        StartIndex = FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Top : Origin180.Bottom, (amount - 0.5f) / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Top : Origin180.Bottom, (amount - 0.5f) / 0.5f, clockwise, StartIndex, reverse);
 
                         if (clockwise)
                         {
@@ -742,7 +945,11 @@ namespace FairyGUI
                             vertRect.Y += vertRect.height;
                             uvRect.Y += uvRect.height;
                         }
-                        ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        if (reverse != ReverseType.None)
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, StartIndex, null, 0);
+                        else
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        StartIndex += 4;
                     }
                     break;
 
@@ -756,7 +963,7 @@ namespace FairyGUI
                             vertRect.Y += vertRect.height;
                             uvRect.Y += uvRect.height;
                         }
-                        StartIndex = FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Top : Origin180.Bottom, amount / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Top : Origin180.Bottom, amount / 0.5f, clockwise, StartIndex, reverse);
                     }
                     else
                     {
@@ -768,7 +975,7 @@ namespace FairyGUI
                             uvRect.Y += uvRect.height;
                         }
 
-                        StartIndex = FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Bottom : Origin180.Top, (amount - 0.5f) / 0.5f, clockwise, StartIndex);
+                        StartIndex += FillRadial180(surfaceTool, vertRect, uvRect, clockwise ? Origin180.Bottom : Origin180.Top, (amount - 0.5f) / 0.5f, clockwise, StartIndex, reverse);
 
                         if (clockwise)
                         {
@@ -780,11 +987,15 @@ namespace FairyGUI
                             vertRect.Y -= vertRect.height;
                             uvRect.Y -= uvRect.height;
                         }
-                        ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        if (reverse != ReverseType.None)
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, outColor, StartIndex, null, 0);
+                        else
+                            ToolSet.MeshAddRect(surfaceTool, vertRect, uvRect, StartIndex);
+                        StartIndex += 4;
                     }
                     break;
             }
-            return StartIndex;
+            return StartIndex - firstIndex;
         }
 
 
@@ -807,11 +1018,12 @@ namespace FairyGUI
         float[] gridTexX = new float[4];
         float[] gridTexY = new float[4];
 
-        void SliceFill(SurfaceTool surfaceTool, Rect contentRect, Rect uvRect, float sourceW, float sourceH)
+        int SliceFill(SurfaceTool surfaceTool, Rect contentRect, Rect uvRect, float sourceW, float sourceH)
         {
             Rect gridRect = (Rect)_scale9Grid;
             contentRect.width *= _textureScale.X;
             contentRect.height *= _textureScale.Y;
+            int vertexCount = 0;
 
             if (_flip != FlipType.None)
             {
@@ -883,6 +1095,7 @@ namespace FairyGUI
                     {
                         surfaceTool.SetUV(new Vector2(gridTexX[cx], gridTexY[cy]));
                         surfaceTool.AddVertex(new Vector3(gridX[cx] / _textureScale.X, gridY[cy] / _textureScale.Y, 0));
+                        vertexCount++;
                     }
                 }
                 for (int i = 0; i < TRIANGLES_9_GRID.Length; i++)
@@ -896,7 +1109,6 @@ namespace FairyGUI
                 Rect texRect;
                 int row, col;
                 int part;
-                int StartIndex = 0;
 
                 for (int pi = 0; pi < 9; pi++)
                 {
@@ -908,9 +1120,9 @@ namespace FairyGUI
 
                     if (part != -1 && (_tileGridIndice & (1 << part)) != 0)
                     {
-                        StartIndex = TileFill(surfaceTool, drawRect, texRect,
+                        vertexCount += TileFill(surfaceTool, drawRect, texRect,
                             (part == 0 || part == 1 || part == 4) ? gridRect.width : drawRect.width,
-                            (part == 2 || part == 3 || part == 4) ? gridRect.height : drawRect.height, StartIndex);
+                            (part == 2 || part == 3 || part == 4) ? gridRect.height : drawRect.height, vertexCount);
                     }
                     else
                     {
@@ -918,11 +1130,12 @@ namespace FairyGUI
                         drawRect.Y /= _textureScale.Y;
                         drawRect.width /= _textureScale.X;
                         drawRect.height /= _textureScale.Y;
-                        ToolSet.MeshAddRect(surfaceTool, drawRect, texRect, StartIndex);
-                        StartIndex += 4;
+                        ToolSet.MeshAddRect(surfaceTool, drawRect, texRect, vertexCount);
+                        vertexCount += 4;
                     }
                 }
             }
+            return vertexCount;
         }
 
         int TileFill(SurfaceTool surfaceTool, Rect contentRect, Rect uvRect, float sourceW, float sourceH, int StartIndex)
@@ -933,6 +1146,7 @@ namespace FairyGUI
             float tailHeight = contentRect.height - (vc - 1) * sourceH;
             float xMax = uvRect.xMax;
             float yMax = uvRect.yMax;
+            int firstIndex = StartIndex;
             for (int i = 0; i < hc; i++)
             {
                 for (int j = 0; j < vc; j++)
@@ -955,12 +1169,17 @@ namespace FairyGUI
                     StartIndex += 4;
                 }
             }
-            return StartIndex;
+            return StartIndex - firstIndex;
         }
 
         public override void _Draw()
         {
-            BuildMesh(_surfaceTool);
+            UpdateMesh();
+            if (maskOwner != null)
+            {
+                maskOwner.QueueRedraw();
+                return;
+            }
             if (!Mathf.IsEqualApprox(_skewX, 0) || !Mathf.IsEqualApprox(_skewY, 0))
             {
                 float shx = Mathf.DegToRad(-_skewX);

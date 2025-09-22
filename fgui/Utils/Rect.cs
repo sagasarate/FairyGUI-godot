@@ -557,5 +557,14 @@ namespace FairyGUI
         {
             return string.Format("(x:{0}, y:{1}, width:{2}, height:{3})", X.ToString(format, CultureInfo.InvariantCulture.NumberFormat), Y.ToString(format, CultureInfo.InvariantCulture.NumberFormat), width.ToString(format, CultureInfo.InvariantCulture.NumberFormat), height.ToString(format, CultureInfo.InvariantCulture.NumberFormat));
         }
+        public bool IsZeroApprox()
+        {
+            return Mathf.IsZeroApprox(m_XMin) && Mathf.IsZeroApprox(m_YMin) && Mathf.IsZeroApprox(m_Width) && Mathf.IsZeroApprox(m_Height);
+        }
+        public bool IsEqualApprox(Rect target)
+        {
+            return Mathf.IsEqualApprox(m_XMin, target.m_XMin) && Mathf.IsEqualApprox(m_YMin, target.m_YMin) &&
+                Mathf.IsEqualApprox(m_Width, target.m_Width) && Mathf.IsEqualApprox(m_Height, target.m_Height);
+        }
     }
 }

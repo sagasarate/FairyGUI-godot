@@ -78,8 +78,8 @@ namespace FairyGUI
             int dx = ProjectSettings.GetSetting("display/window/size/viewport_width").AsInt32();
             int dy = ProjectSettings.GetSetting("display/window/size/viewport_height").AsInt32();
             string aspect = ProjectSettings.GetSetting("display/window/stretch/aspect").AsString();
-            float screenWidth = Stage.inst.GetViewport().GetVisibleRect().Size.X;
-            float screenHeight = Stage.inst.GetViewport().GetVisibleRect().Size.Y;
+            float screenWidth = Stage.width;
+            float screenHeight = Stage.height;
 
             if (screenWidth > screenHeight && dx < dy || screenWidth < screenHeight && dx > dy)
             {

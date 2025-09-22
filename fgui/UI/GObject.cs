@@ -109,17 +109,17 @@ namespace FairyGUI
         bool _pivotAsAnchor;
         float _alpha;
         float _rotation;
-        bool _visible = true;
-        bool _internalVisible = true;
+        protected bool _visible = true;
+        protected bool _internalVisible = true;
         bool _handlingController;
-        bool _touchable = true;
+        protected bool _touchable = true;
         bool _grayed;
         bool _draggable;
         float _scaleX;
         float _scaleY;
         int _sortingOrder;
         string _tooltips;
-        bool _focusable = false;
+        bool _focusable = true;
         bool _tabStop = false;
         GGroup _group;
 
@@ -351,9 +351,13 @@ namespace FairyGUI
         /// <summary>
         /// 设置对象为全屏大小（逻辑屏幕）。
         /// </summary>
-        public void MakeFullScreen()
+        public void MakeFullScreen(bool restraint = true)
         {
             this.SetSize(GRoot.inst.width, GRoot.inst.height);
+            if (restraint)
+            {
+                this.AddRelation(GRoot.inst, RelationType.Size);
+            }
         }
 
         /// <summary>
@@ -717,7 +721,7 @@ namespace FairyGUI
                 {
                     _touchable = value;
                     UpdateGear(3);
-                    UpdateFocusMode();                    
+                    UpdateFocusMode();
                 }
             }
         }
@@ -1676,7 +1680,7 @@ namespace FairyGUI
                     xv -= _width * _pivotX;
                     yv -= _height * _pivotY;
                 }
-                displayObject.node.Position = new Vector2(xv, yv);
+                displayObject.position = new Vector2(xv, yv);
             }
         }
 
@@ -1724,27 +1728,27 @@ namespace FairyGUI
         {
         }
 
-        protected NContainer AddParentContainer(Control node)
+        protected NContainer AddParentContainer(IDisplayObject displayObject)
         {
             var parent = new NContainer(this);
-            parent.Size = node.Size;
-            parent.Scale = node.Scale;
-            parent.Rotation = node.Rotation;
-            parent.Position = node.Position;
-            node.Scale = Vector2.One;
-            node.Rotation = 0;
-            node.Position = Vector2.Zero;
-            if (node.GetParent() != null)
-                node.AddSibling(parent);
-            parent.AddChild(node);
+            parent.Size = displayObject.node.Size;
+            parent.Scale = displayObject.node.Scale;
+            parent.Rotation = displayObject.node.Rotation;
+            parent.position = displayObject.position;
+            displayObject.node.Scale = Vector2.One;
+            displayObject.node.Rotation = 0;
+            displayObject.position = Vector2.Zero;
+            if (displayObject.node.GetParent() != null)
+                displayObject.node.AddSibling(parent);
+            parent.AddChild(displayObject.node);
             return parent;
         }
 
-        public virtual GObject HitTest(Vector2 viewPoint)
+        public virtual GObject HitTest(Vector2 viewPoint, bool forceTest = false)
         {
             if (displayObject == null)
                 return null;
-            if (!_touchable || !visible || !internalVisible)
+            if (!forceTest && (!touchable || !visible || !internalVisible))
                 return null;
             var localPoint = ViewportToLocal(viewPoint);
             if (localPoint.X < 0 || localPoint.Y < 0 || localPoint.X > _width || localPoint.Y > _height)
@@ -1830,6 +1834,8 @@ namespace FairyGUI
                 buffer.ReadFloat();
                 buffer.ReadFloat();
             }
+
+            UpdateFocusMode();
 
             string str = buffer.ReadS();
             if (str != null)

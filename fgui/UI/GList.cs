@@ -2550,7 +2550,7 @@ namespace FairyGUI
                 if (scrollPane != null)
                     scrollPane.AdjustMaskContainer();
                 else
-                    container.Position = new Vector2(_margin.left + _alignOffset.X, _margin.top + _alignOffset.Y);
+                    container.position = new Vector2(_margin.left + _alignOffset.X, _margin.top + _alignOffset.Y);
             }
         }
 

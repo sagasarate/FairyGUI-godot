@@ -73,9 +73,7 @@ namespace FairyGUI
                 _errorSign.Dispose();
             if (_content2 != null)
                 _content2.Dispose();
-            _content.Dispose();
-            (displayObject as NContainer)?.Dispose();
-            displayObject = null;
+            _content.QueueFree();
 
             base.Dispose();
         }
@@ -661,7 +659,7 @@ namespace FairyGUI
                     }
                     else
                     {
-                        _content.Position = Vector2.Zero;
+                        _content.position = Vector2.Zero;
                         _content.Size = new Vector2(contentWidth, contentHeight);
                     }
 
@@ -740,7 +738,7 @@ namespace FairyGUI
             if (_content2 != null)
                 _content2.SetXY(nx, ny);
             else
-                _content.Position = new Vector2(nx, ny);
+                _content.position = new Vector2(nx, ny);
 
         }
 
