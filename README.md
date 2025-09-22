@@ -4,7 +4,7 @@
 -不支持变灰  
 -不支持滤镜  
 -BlendMode有限制  
--不支持遮罩  
+~~-不支持遮罩~~(已支持)  
 -不支持FGUI编辑器内制作的BmpFont，只能在Godot引擎内制作并注册进FGUI  
 -文本和输入组件是使用Godot的对应组件包装而成，所以功能受限，比如除了RichTextField都不支持UBB，RichTextField也无法引用UI包中的图片，等等  
   
