@@ -192,7 +192,7 @@ namespace FairyGUI
 
             if (buffer.ReadBool())
             {
-                GTextInput input = GetTextField() as GTextInput;
+                GTextInput input = GetChild("title") as GTextInput;
                 if (input != null)
                 {
                     str = buffer.ReadS();
