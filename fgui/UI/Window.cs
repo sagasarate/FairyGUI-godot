@@ -241,7 +241,7 @@ namespace FairyGUI
         /// </summary>
         public bool isShowing
         {
-            get { return parent != null; }
+            get { return parent != null && visible; }
         }
 
         /// <summary>
@@ -249,7 +249,7 @@ namespace FairyGUI
         /// </summary>
         public bool isTop
         {
-            get { return parent != null && parent.GetChildIndex(this) == parent.numChildren - 1; }
+            get { return parent != null && visible && parent.GetChildIndex(this) == parent.numChildren - 1; }
         }
 
         /// <summary>
